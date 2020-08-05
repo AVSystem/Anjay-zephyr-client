@@ -22,6 +22,12 @@ The following LwM2M Objects are supported:
 - Gyrometer (/3334),
 - Push button (/3347).
 
+## Cloning the repository
+
+```
+git clone --recursive https://github.com/AVSystem/Anjay-zephyr-client
+```
+
 ## Compilation guide
 
 First of all, get Zephyr, SDK and other dependecies, as described in Zephyr's
@@ -51,6 +57,8 @@ To connect to [Coiote IoT Device
 Management](https://www.avsystem.com/products/coiote-iot-device-management-platform/) LwM2M Server,
 please register at https://www.avsystem.com/try-anjay/. Then have a look at the Configuration menu
 to configure security credentials and other necessary settings (like Wi-Fi SSID etc.).
+
+[Video guide showing basic usage of Try-Anjay](https://www.youtube.com/watch?v=fgy38XfttM8) is available on YouTube.
 
 NOTE: You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI can be changed
 in the Configuration menu.
