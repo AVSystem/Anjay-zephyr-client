@@ -561,7 +561,11 @@
  * Requires an operating environment that supports a clock_gettime() call
  * compatible with POSIX.
  */
-#define AVS_COMMONS_UTILS_WITH_POSIX_AVS_TIME
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+#    define AVS_COMMONS_UTILS_WITH_POSIX_AVS_TIME
+#else // CONFIG_BOARD_DISCO_L475_IOT1
+/* #undef AVS_COMMONS_UTILS_WITH_POSIX_AVS_TIME */
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
 
 /**
  * Enable the default implementation of avs_malloc(), avs_free(), avs_calloc()

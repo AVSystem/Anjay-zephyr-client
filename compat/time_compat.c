@@ -14,22 +14,13 @@
  * limitations under the License.
  */
 
-#pragma once
+#include <avsystem/commons/avs_time.h>
+#include <kernel.h>
 
-#include <avsystem/commons/avs_log.h>
+avs_time_monotonic_t avs_time_monotonic_now(void) {
+    return avs_time_monotonic_from_scalar(k_uptime_get(), AVS_TIME_MS);
+}
 
-#define CLIENT_VERSION "20.10"
-
-#define DEFAULT_LOG_LEVEL AVS_LOG_INFO
-
-#ifdef CONFIG_WIFI
-#    define WIFI_SSID "ssid"
-
-#    define WIFI_PASSWORD "password"
-#endif // CONFIG_WIFI
-
-#define SERVER_URI "coaps://try-anjay.avsystem.com:5684"
-
-#define PSK_KEY "psk"
-
-#define NTP_SERVER "time.nist.gov"
+avs_time_real_t avs_time_real_now(void) {
+    return avs_time_real_from_scalar(k_uptime_get(), AVS_TIME_MS);
+}

@@ -44,8 +44,10 @@
 FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 
 typedef struct {
+#ifdef CONFIG_WIFI
     char ssid[32];
     char password[32];
+#endif // CONFIG_WIFI
     char uri[128];
     char ep_name[64];
     char psk[32];
@@ -56,8 +58,10 @@ static app_config_t APP_CONFIG;
 // To preserve backward compatibility, do not remove any of these and add new
 // options IDs right before _OPTION_STRING_END.
 typedef enum {
+#ifdef CONFIG_WIFI
     OPTION_SSID,
     OPTION_PASSWORD,
+#endif // CONFIG_WIFI
     OPTION_URI,
     OPTION_EP_NAME,
     OPTION_PSK,
@@ -77,9 +81,11 @@ typedef struct {
 } option_t;
 
 static option_t STRING_OPTIONS[] = {
+#ifdef CONFIG_WIFI
     [OPTION_SSID] = { "Wi-Fi SSID", APP_CONFIG.ssid, sizeof(APP_CONFIG.ssid) },
     [OPTION_PASSWORD] = { "Wi-Fi password", APP_CONFIG.password,
                           sizeof(APP_CONFIG.password) },
+#endif // CONFIG_WIFI
     [OPTION_URI] = { "LwM2M Server URI", APP_CONFIG.uri,
                      sizeof(APP_CONFIG.uri) },
     [OPTION_EP_NAME] = { "Endpoint name", APP_CONFIG.ep_name,
@@ -133,6 +139,10 @@ write_to_file(struct fs_file_t *file, const void *value, size_t value_len) {
 }
 
 static int write_config_to_flash(void) {
+    // If file isn't removed before the write operation, sometimes it may be in
+    // invalid state after call to fs_close().
+    fs_unlink(CONFIG_FILE_PATH);
+
     struct fs_file_t file;
     if (fs_open(&file, CONFIG_FILE_PATH)) {
         avs_log(fs, ERROR, "Failed to open %s", CONFIG_FILE_PATH);
@@ -294,8 +304,10 @@ static int get_option_selection(option_selection_t *selection) {
 
 static void default_config_init(void) {
     APP_CONFIG = (app_config_t) {
+#ifdef CONFIG_WIFI
         .ssid = WIFI_SSID,
         .password = WIFI_PASSWORD,
+#endif // CONFIG_WIFI
         .uri = SERVER_URI,
         .psk = PSK_KEY
     };
@@ -372,9 +384,12 @@ void config_init(void) {
         default_config_init();
     }
 
-    struct device *uart = device_get_binding("UART_1");
+    struct device *uart = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
     if (!uart) {
-        avs_log(menu, WARNING, "Failed to get UART_1 binding");
+        avs_log(menu,
+                WARNING,
+                "Failed to get %s binding",
+                CONFIG_UART_CONSOLE_ON_DEV_NAME);
         return;
     }
 
@@ -401,6 +416,7 @@ const char *config_get_endpoint_name(void) {
     return APP_CONFIG.ep_name;
 }
 
+#ifdef CONFIG_WIFI
 const char *config_get_wifi_ssid(void) {
     return APP_CONFIG.ssid;
 }
@@ -408,6 +424,7 @@ const char *config_get_wifi_ssid(void) {
 const char *config_get_wifi_password(void) {
     return APP_CONFIG.password;
 }
+#endif // CONFIG_WIFI
 
 const char *config_get_server_uri(void) {
     return APP_CONFIG.uri;

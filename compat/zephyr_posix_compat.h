@@ -14,25 +14,27 @@
  * limitations under the License.
  */
 
-#include <net/socket.h>
-
 #include <fcntl.h>
-#include <netdb.h>
-#include <poll.h>
 #include <unistd.h>
-#include <sys/socket.h>
+
+#ifdef CONFIG_POSIX_API
+#    include <net/socket.h>
+#    include <netdb.h>
+#    include <poll.h>
+#    include <sys/socket.h>
+#endif // CONFIG_POSIX_API
 
 typedef int sockfd_t;
 
-static inline int getsockname(int sock,
-                              struct sockaddr *addr,
-                              socklen_t *addrlen) {
+#ifdef CONFIG_POSIX_API
+static inline int
+getsockname(int sock, struct sockaddr *addr, socklen_t *addrlen) {
     return zsock_getsockname(sock, addr, addrlen);
 }
+#endif // CONFIG_POSIX_API
 
-static inline int getpeername(int sock,
-                              struct sockaddr *addr,
-                              socklen_t *addrlen) {
+static inline int
+getpeername(int sock, struct sockaddr *addr, socklen_t *addrlen) {
     // Zephyr does not provide getpeername() in any form. Luckily, it's not
     // necessary for Anjay to work, so let's fake an always-failing one.
     (void) sock;

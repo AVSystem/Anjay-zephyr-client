@@ -26,8 +26,13 @@
 #include "../default_config.h"
 #include "../utils.h"
 
-#define DEVICE_MANUFACTURER "STMicroelectronics"
-#define MODEL_NUMBER "B-L475E-IOT01A"
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+#    define DEVICE_MANUFACTURER "STMicroelectronics"
+#    define MODEL_NUMBER "B-L475E-IOT01A"
+#else // CONFIG_BOARD_DISCO_L475_IOT1
+#    define DEVICE_MANUFACTURER "Nordic Semiconductor"
+#    define MODEL_NUMBER "nRF9160DK"
+#endif // CONFIG_BOARD_DISCO_L475_IOT1s
 
 #define SUPPORTED_BINDING_MODES "UQ"
 
@@ -215,19 +220,20 @@ static int resource_write(anjay_t *anjay,
                           anjay_riid_t riid,
                           anjay_input_ctx_t *ctx) {
     (void) anjay;
+    (void) obj_ptr;
 
-    device_object_t *obj = get_obj(obj_ptr);
-    assert(obj);
     assert(iid == 0);
 
     switch (rid) {
     case RID_CURRENT_TIME: {
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
         struct timespec ts;
         ts.tv_nsec = 0;
         if (anjay_get_i64(ctx, &ts.tv_sec)
                 || clock_settime(CLOCK_REALTIME, &ts)) {
             return -1;
         }
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
         return 0;
     }
     default:
@@ -262,9 +268,8 @@ static int list_resource_instances(anjay_t *anjay,
                                    anjay_rid_t rid,
                                    anjay_dm_list_ctx_t *ctx) {
     (void) anjay;
+    (void) obj_ptr;
 
-    device_object_t *obj = get_obj(obj_ptr);
-    assert(obj);
     assert(iid == 0);
 
     switch (rid) {

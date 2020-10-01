@@ -20,9 +20,11 @@ void config_init(void);
 
 const char *config_get_endpoint_name(void);
 
+#ifdef CONFIG_WIFI
 const char *config_get_wifi_ssid(void);
 
 const char *config_get_wifi_password(void);
+#endif // CONFIG_WIFI
 
 const char *config_get_server_uri(void);
 

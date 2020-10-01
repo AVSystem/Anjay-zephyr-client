@@ -14,16 +14,14 @@
  * limitations under the License.
  */
 
-#include <poll.h>
 #include <stdio.h>
 
+#include <devicetree.h>
 #include <zephyr.h>
 
 #include <drivers/entropy.h>
 #include <net/dns_resolve.h>
 #include <net/sntp.h>
-#include <net/wifi.h>
-#include <net/wifi_mgmt.h>
 #include <posix/time.h>
 
 #include <anjay/anjay.h>
@@ -35,11 +33,20 @@
 #include <avsystem/commons/avs_prng.h>
 
 #include "default_config.h"
-#include "led.h"
 #include "menu.h"
 
+#include "led.h"
 #include "objects/objects.h"
 
+#ifdef CONFIG_WIFI
+#    include <net/wifi.h>
+#    include <net/wifi_mgmt.h>
+#    include <poll.h>
+#else // CONFIG_WIFI
+#    include <modem/lte_lc.h>
+#endif // CONFIG_WIFI
+
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
 static const anjay_dm_object_def_t **TEMPERATURE_OBJ;
 static const anjay_dm_object_def_t **HUMIDITY_OBJ;
 static const anjay_dm_object_def_t **DISTANCE_OBJ;
@@ -47,6 +54,9 @@ static const anjay_dm_object_def_t **BAROMETER_OBJ;
 static const anjay_dm_object_def_t **ACCELEROMETER_OBJ;
 static const anjay_dm_object_def_t **GYROMETER_OBJ;
 static const anjay_dm_object_def_t **MAGNETOMETER_OBJ;
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+static const anjay_dm_object_def_t **SWITCH_OBJ;
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
 static const anjay_dm_object_def_t **PUSH_BUTTON_OBJ;
 static const anjay_dm_object_def_t **DEVICE_OBJ;
 
@@ -57,21 +67,12 @@ K_MUTEX_DEFINE(ANJAY_MTX);
     for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); \
          !_synchronized_exit; _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))
 
-void update_sensors(void);
-
 // main thread priority is 0 and 1 is the lower priority
-#define UPDATE_SENSORS_THREAD_PRIO 1
-#define UPDATE_SENSORS_THREAD_STACK_SIZE 2048
+#define UPDATE_OBJECTS_THREAD_PRIO 1
+#define UPDATE_OBJECTS_THREAD_STACK_SIZE 2048
 
-K_THREAD_DEFINE(update_sensors_thread_id,
-                UPDATE_SENSORS_THREAD_STACK_SIZE,
-                update_sensors,
-                NULL,
-                NULL,
-                NULL,
-                UPDATE_SENSORS_THREAD_PRIO,
-                0,
-                0);
+static struct k_thread UPDATE_OBJECTS_THREAD;
+K_THREAD_STACK_DEFINE(UPDATE_OBJECTS_STACK, UPDATE_OBJECTS_THREAD_STACK_SIZE);
 
 void main_loop(void) {
     while (true) {
@@ -119,8 +120,6 @@ void main_loop(void) {
             }
         }
 
-        disco_led_toggle(DISCO_LED1);
-
         // Finally run the scheduler
         SYNCHRONIZED(ANJAY_MTX) {
             anjay_sched_run(ANJAY);
@@ -133,24 +132,53 @@ log_handler(avs_log_level_t level, const char *module, const char *message) {
     printf("%s\n", message);
 }
 
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
 int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
     assert(dev);
     if (entropy_get_entropy((struct device *) dev, out_buf, out_buf_len)) {
         avs_log(zephyr_demo, ERROR, "Failed to get random bits");
         return -1;
     }
-
     return 0;
 }
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
+    assert(dev);
+    // entropy_get_entropy() of nRF CC310 library requires the input buffer to
+    // be 144 bytes long
+    uint8_t buf[144];
+    size_t remaining_bytes = out_buf_len;
+    do {
+        if (entropy_get_entropy((struct device *) dev, buf, sizeof(buf))) {
+            avs_log(zephyr_demo, ERROR, "Failed to get random bits");
+            return -1;
+        }
+        size_t num_of_bytes_to_copy;
+        if (remaining_bytes < sizeof(buf)) {
+            num_of_bytes_to_copy = remaining_bytes;
+            remaining_bytes = 0;
+        } else {
+            num_of_bytes_to_copy = sizeof(buf);
+            remaining_bytes -= sizeof(buf);
+        }
+        memcpy(out_buf, buf, num_of_bytes_to_copy);
+        out_buf += num_of_bytes_to_copy;
+    } while (remaining_bytes);
+    return 0;
+}
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
 
-void update_sensors(void) {
-    while (!ANJAY) {
-        k_sleep(K_SECONDS(1));
-    }
+void update_objects(void *arg1, void *arg2, void *arg3) {
+    (void) arg1;
+    (void) arg2;
+    (void) arg3;
+
+    assert(ANJAY);
 
     size_t cycle = 0;
     while (ANJAY) {
         SYNCHRONIZED(ANJAY_MTX) {
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
             if (cycle % 5 == 0) {
                 temperature_object_update(ANJAY, TEMPERATURE_OBJ);
                 humidity_object_update(ANJAY, HUMIDITY_OBJ);
@@ -160,6 +188,9 @@ void update_sensors(void) {
                 gyrometer_object_update(ANJAY, GYROMETER_OBJ);
                 magnetometer_object_update(ANJAY, MAGNETOMETER_OBJ);
             }
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+            switch_object_update(ANJAY, SWITCH_OBJ);
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
             push_button_object_update(ANJAY, PUSH_BUTTON_OBJ);
             device_object_update(ANJAY, DEVICE_OBJ);
         }
@@ -187,13 +218,9 @@ void synchronize_clock(void) {
     }
 }
 
-void main(void) {
-    avs_log_set_handler(log_handler);
-    avs_log_set_default_level(DEFAULT_LOG_LEVEL);
-
-    config_init();
-    disco_led_init();
-
+void initialize_network(void) {
+    avs_log(zephyr_demo, INFO, "Initializing network connection...");
+#ifdef CONFIG_WIFI
     struct net_if *iface = net_if_get_default();
 
     struct wifi_connect_req_params wifi_params = {
@@ -213,6 +240,25 @@ void main(void) {
 
     net_mgmt_event_wait_on_iface(iface, NET_EVENT_IPV4_ADDR_ADD, NULL, NULL,
                                  NULL, K_FOREVER);
+#else  // CONFIG_WIFI
+    int ret = lte_lc_init_and_connect();
+    if (ret < 0) {
+        avs_log(zephyr_demo, ERROR, "LTE link could not be established.");
+        while (true) {
+        }
+    }
+#endif // CONFIG_WIFI
+    avs_log(zephyr_demo, INFO, "Connected to network");
+}
+
+void main(void) {
+    avs_log_set_handler(log_handler);
+    avs_log_set_default_level(DEFAULT_LOG_LEVEL);
+
+    config_init();
+    disco_led_init();
+
+    initialize_network();
 
     const char *dns_servers[] = { "8.8.8.8", NULL };
     if (dns_resolve_init(dns_resolve_get_default(), dns_servers, NULL)) {
@@ -221,7 +267,9 @@ void main(void) {
         }
     }
 
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
     synchronize_clock();
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
 
     struct device *entropy_dev =
             device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
@@ -254,8 +302,6 @@ void main(void) {
         }
     }
 
-    avs_log(zephyr_demo, INFO, "Endpoint name: %s", config.endpoint_name);
-
     // Install attr_storage and necessary objects
     if (anjay_attr_storage_install(ANJAY)
             || anjay_security_object_install(ANJAY)
@@ -264,7 +310,12 @@ void main(void) {
         goto cleanup;
     }
 
-    if (!(TEMPERATURE_OBJ = temperature_object_create())
+    if (!(DEVICE_OBJ = device_object_create())
+            || anjay_register_object(ANJAY, DEVICE_OBJ)
+            || !(PUSH_BUTTON_OBJ = push_button_object_create())
+            || anjay_register_object(ANJAY, PUSH_BUTTON_OBJ)
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+            || !(TEMPERATURE_OBJ = temperature_object_create())
             || anjay_register_object(ANJAY, TEMPERATURE_OBJ)
             || !(HUMIDITY_OBJ = humidity_object_create())
             || anjay_register_object(ANJAY, HUMIDITY_OBJ)
@@ -278,11 +329,12 @@ void main(void) {
             || anjay_register_object(ANJAY, GYROMETER_OBJ)
             || !(MAGNETOMETER_OBJ = magnetometer_object_create())
             || anjay_register_object(ANJAY, MAGNETOMETER_OBJ)
-            || !(PUSH_BUTTON_OBJ = push_button_object_create())
-            || anjay_register_object(ANJAY, PUSH_BUTTON_OBJ)
-            || !(DEVICE_OBJ = device_object_create())
-            || anjay_register_object(ANJAY, DEVICE_OBJ)) {
-        avs_log(zephyr_demo, ERROR, "Failed to initialize sensors");
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+            || !(SWITCH_OBJ = switch_object_create())
+            || anjay_register_object(ANJAY, SWITCH_OBJ)
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
+    ) {
+        avs_log(zephyr_demo, ERROR, "Failed to initialize objects");
         goto cleanup;
     }
 
@@ -318,11 +370,16 @@ void main(void) {
         goto cleanup;
     }
 
+    k_thread_create(&UPDATE_OBJECTS_THREAD, UPDATE_OBJECTS_STACK,
+                    UPDATE_OBJECTS_THREAD_STACK_SIZE, update_objects, NULL,
+                    NULL, NULL, UPDATE_OBJECTS_THREAD_PRIO, 0, K_NO_WAIT);
+
     main_loop();
 
 cleanup:
     anjay_delete(ANJAY);
     avs_crypto_prng_free(&prng_ctx);
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
     temperature_object_release(TEMPERATURE_OBJ);
     humidity_object_release(HUMIDITY_OBJ);
     distance_object_release(DISTANCE_OBJ);
@@ -330,6 +387,9 @@ cleanup:
     accelerometer_object_release(ACCELEROMETER_OBJ);
     gyrometer_object_release(GYROMETER_OBJ);
     magnetometer_object_release(MAGNETOMETER_OBJ);
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+    switch_object_release(SWITCH_OBJ);
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
     push_button_object_release(PUSH_BUTTON_OBJ);
     device_object_release(DEVICE_OBJ);
 }
