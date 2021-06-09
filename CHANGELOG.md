@@ -1,5 +1,12 @@
 # Changelog
 
+## 21.06 (Jun 7th, 2021)
+
+### Added
+- Use Anjay-zephyr 2.11.1 integration layer
+- Use Zephyr v2.5.0
+- Use Zephyr logger as log handler
+
 ## 20.10 (Oct 1st, 2020)
 
 ### Added

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ typedef struct {
     char uri[128];
     char ep_name[64];
     char psk[32];
+    char bootstrap[2];
 } app_config_t;
 
 static app_config_t APP_CONFIG;
@@ -65,6 +66,7 @@ typedef enum {
     OPTION_URI,
     OPTION_EP_NAME,
     OPTION_PSK,
+    OPTION_BOOTSTRAP,
     _OPTION_STRING_END
 } option_string_id_t;
 
@@ -78,6 +80,7 @@ typedef struct {
     const char *const desc;
     char *const value;
     size_t value_capacity;
+    bool flag;
 } option_t;
 
 static option_t STRING_OPTIONS[] = {
@@ -90,7 +93,9 @@ static option_t STRING_OPTIONS[] = {
                      sizeof(APP_CONFIG.uri) },
     [OPTION_EP_NAME] = { "Endpoint name", APP_CONFIG.ep_name,
                          sizeof(APP_CONFIG.ep_name) },
-    [OPTION_PSK] = { "PSK", APP_CONFIG.psk, sizeof(APP_CONFIG.psk) }
+    [OPTION_PSK] = { "PSK", APP_CONFIG.psk, sizeof(APP_CONFIG.psk) },
+    [OPTION_BOOTSTRAP] = { "Bootstrap", APP_CONFIG.bootstrap,
+                           sizeof(APP_CONFIG.bootstrap), true }
 };
 
 static option_t CONTROL_OPTIONS[] = {
@@ -104,10 +109,18 @@ static int get_value(option_string_id_t id) {
     // +1 for the NULL-byte
     size_t value_len = strlen(value) + 1;
 
-    if (value_len > STRING_OPTIONS[id].value_capacity) {
-        printf("Value too long, maximum length is %d\n",
-               STRING_OPTIONS[id].value_capacity - 1);
-        return -1;
+    if (STRING_OPTIONS[id].flag) {
+        if (value_len != STRING_OPTIONS[id].value_capacity
+                || (value[0] != 'y' && value[0] != 'n')) {
+            printf("Value invalid, 'y' or 'n' is allowed\n");
+            return -1;
+        }
+    } else {
+        if (value_len > STRING_OPTIONS[id].value_capacity) {
+            printf("Value too long, maximum length is %d\n",
+                   STRING_OPTIONS[id].value_capacity - 1);
+            return -1;
+        }
     }
 
     memcpy(STRING_OPTIONS[id].value, value, value_len);
@@ -138,14 +151,22 @@ write_to_file(struct fs_file_t *file, const void *value, size_t value_len) {
     return (fs_write(file, value, value_len) == value_len) ? 0 : -1;
 }
 
+static int open_config_file(struct fs_file_t *file, fs_mode_t flags) {
+    fs_file_t_init(file);
+    if (fs_open(file, CONFIG_FILE_PATH, flags)) {
+        avs_log(fs, ERROR, "Failed to open %s", CONFIG_FILE_PATH);
+        return -1;
+    }
+    return 0;
+}
+
 static int write_config_to_flash(void) {
     // If file isn't removed before the write operation, sometimes it may be in
     // invalid state after call to fs_close().
     fs_unlink(CONFIG_FILE_PATH);
 
     struct fs_file_t file;
-    if (fs_open(&file, CONFIG_FILE_PATH)) {
-        avs_log(fs, ERROR, "Failed to open %s", CONFIG_FILE_PATH);
+    if (open_config_file(&file, FS_O_WRITE | FS_O_CREATE)) {
         return -1;
     }
 
@@ -229,9 +250,8 @@ static int read_config_from_flash(void) {
     }
 
     struct fs_file_t file;
-    if (fs_open(&file, CONFIG_FILE_PATH)) {
-        avs_log(fs, ERROR, "Failed to open %s", CONFIG_FILE_PATH);
-        return 0;
+    if (open_config_file(&file, FS_O_READ)) {
+        return -1;
     }
 
     int result = 0;
@@ -309,7 +329,8 @@ static void default_config_init(void) {
         .password = WIFI_PASSWORD,
 #endif // CONFIG_WIFI
         .uri = SERVER_URI,
-        .psk = PSK_KEY
+        .psk = PSK_KEY,
+        .bootstrap = BOOTSTRAP
     };
 
     device_id_t id;
@@ -371,6 +392,7 @@ void config_init(void) {
         .storage_dev = (void *) FLASH_AREA_ID(storage),
         .mnt_point = MOUNT_POINT,
     };
+
     struct fs_mount_t *mp = &lfs_storage_mnt;
 
     if (fs_mount(mp)) {
@@ -384,7 +406,8 @@ void config_init(void) {
         default_config_init();
     }
 
-    struct device *uart = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+    const struct device *uart =
+            device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
     if (!uart) {
         avs_log(menu,
                 WARNING,
@@ -394,11 +417,11 @@ void config_init(void) {
     }
 
     printf("Press any key to enter config menu...\n");
-    const avs_time_real_t time_limit =
-            avs_time_real_add(avs_time_real_now(),
-                              avs_time_duration_from_scalar(3, AVS_TIME_S));
+    const avs_time_monotonic_t time_limit = avs_time_monotonic_add(
+            avs_time_monotonic_now(),
+            avs_time_duration_from_scalar(3, AVS_TIME_S));
 
-    while (avs_time_real_before(avs_time_real_now(), time_limit)) {
+    while (avs_time_monotonic_before(avs_time_monotonic_now(), time_limit)) {
         char byte;
         if (!uart_poll_in(uart, &byte)) {
             enter_menu();
@@ -432,4 +455,8 @@ const char *config_get_server_uri(void) {
 
 const char *config_get_psk(void) {
     return APP_CONFIG.psk;
+}
+
+bool config_is_bootstrap(void) {
+    return APP_CONFIG.bootstrap[0] == 'y';
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@
 typedef struct switch_instance_struct {
     anjay_iid_t iid;
 
-    struct device *dev;
+    const struct device *dev;
     int gpio_pin;
 
     bool digital_input_state;
@@ -170,7 +170,7 @@ static int configure_switch(switch_object_t *obj,
                             int gpio_pin,
                             int gpio_flags,
                             anjay_iid_t iid) {
-    struct device *dev = device_get_binding(gpio_label);
+    const struct device *dev = device_get_binding(gpio_label);
     if (!dev || gpio_pin_configure(dev, gpio_pin, gpio_flags)) {
         return -1;
     }

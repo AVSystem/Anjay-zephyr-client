@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,12 +16,12 @@
 
 #pragma once
 
-typedef enum { DISCO_LED1, DISCO_LED2 } disco_led_t;
+typedef enum { LED1, LED2 } led_t;
 
-void disco_led_init(void);
+void led_init(void);
 
-void disco_led_on(disco_led_t led);
+void led_on(led_t led);
 
-void disco_led_off(disco_led_t led);
+void led_off(led_t led);
 
-void disco_led_toggle(disco_led_t led);
+void led_toggle(led_t led);

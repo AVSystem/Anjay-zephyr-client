@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,8 @@
 
 #include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_prng.h>
+#include <logging/log.h>
+LOG_MODULE_REGISTER(anjay);
 
 #include "default_config.h"
 #include "menu.h"
@@ -41,10 +43,13 @@
 #ifdef CONFIG_WIFI
 #    include <net/wifi.h>
 #    include <net/wifi_mgmt.h>
-#    include <poll.h>
 #else // CONFIG_WIFI
 #    include <modem/lte_lc.h>
 #endif // CONFIG_WIFI
+
+#ifdef CONFIG_BOARD_NRF9160DK_NRF9160NS
+#    include <date_time.h>
+#endif // CONFIG_BOARD_NRF9160DK_NRF9160NS
 
 #ifdef CONFIG_BOARD_DISCO_L475_IOT1
 static const anjay_dm_object_def_t **TEMPERATURE_OBJ;
@@ -129,44 +134,66 @@ void main_loop(void) {
 
 static void
 log_handler(avs_log_level_t level, const char *module, const char *message) {
-    printf("%s\n", message);
+    switch (level) {
+    case AVS_LOG_TRACE:
+    case AVS_LOG_DEBUG:
+        LOG_DBG("%s", log_strdup(message));
+        break;
+
+    case AVS_LOG_INFO:
+        LOG_INF("%s", log_strdup(message));
+        break;
+
+    case AVS_LOG_WARNING:
+        LOG_WRN("%s", log_strdup(message));
+        break;
+
+    case AVS_LOG_ERROR:
+        LOG_ERR("%s", log_strdup(message));
+        break;
+
+    default:
+        break;
+    }
 }
 
-#ifdef CONFIG_BOARD_DISCO_L475_IOT1
 int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
     assert(dev);
-    if (entropy_get_entropy((struct device *) dev, out_buf, out_buf_len)) {
+    if (entropy_get_entropy((const struct device *) dev, out_buf,
+                            out_buf_len)) {
         avs_log(zephyr_demo, ERROR, "Failed to get random bits");
         return -1;
     }
     return 0;
 }
+
+#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+static void set_system_time(const struct sntp_time *time) {
+    struct timespec ts = {
+        .tv_sec = time->seconds,
+        .tv_nsec = ((uint64_t) time->fraction * 1000000000) >> 32
+    };
+    if (clock_settime(CLOCK_REALTIME, &ts)) {
+        avs_log(zephyr_demo, WARNING, "Failed to set time");
+    }
+}
 #else  // CONFIG_BOARD_DISCO_L475_IOT1
-int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
-    assert(dev);
-    // entropy_get_entropy() of nRF CC310 library requires the input buffer to
-    // be 144 bytes long
-    uint8_t buf[144];
-    size_t remaining_bytes = out_buf_len;
-    do {
-        if (entropy_get_entropy((struct device *) dev, buf, sizeof(buf))) {
-            avs_log(zephyr_demo, ERROR, "Failed to get random bits");
-            return -1;
-        }
-        size_t num_of_bytes_to_copy;
-        if (remaining_bytes < sizeof(buf)) {
-            num_of_bytes_to_copy = remaining_bytes;
-            remaining_bytes = 0;
-        } else {
-            num_of_bytes_to_copy = sizeof(buf);
-            remaining_bytes -= sizeof(buf);
-        }
-        memcpy(out_buf, buf, num_of_bytes_to_copy);
-        out_buf += num_of_bytes_to_copy;
-    } while (remaining_bytes);
-    return 0;
+static void set_system_time(const struct sntp_time *time) {
+    const struct tm *current_time = gmtime(&time->seconds);
+    date_time_set(current_time);
+    date_time_update_async(NULL);
 }
 #endif // CONFIG_BOARD_DISCO_L475_IOT1
+
+void synchronize_clock(void) {
+    struct sntp_time time;
+    const uint32_t timeout_ms = 5000;
+    if (sntp_simple(NTP_SERVER, timeout_ms, &time)) {
+        avs_log(zephyr_demo, WARNING, "Failed to get current time");
+    } else {
+        set_system_time(&time);
+    }
+}
 
 void update_objects(void *arg1, void *arg2, void *arg3) {
     (void) arg1;
@@ -195,26 +222,10 @@ void update_objects(void *arg1, void *arg2, void *arg3) {
             device_object_update(ANJAY, DEVICE_OBJ);
         }
 
-        disco_led_toggle(DISCO_LED2);
+        led_toggle(LED2);
 
         cycle++;
         k_sleep(K_SECONDS(1));
-    }
-}
-
-void synchronize_clock(void) {
-    struct sntp_time time;
-    const uint32_t timeout_ms = 5000;
-    if (sntp_simple(NTP_SERVER, timeout_ms, &time)) {
-        avs_log(zephyr_demo, WARNING, "Failed to get current time");
-    } else {
-        struct timespec ts = {
-            .tv_sec = time.seconds,
-            .tv_nsec = ((uint64_t) time.fraction * 1000000000) >> 32
-        };
-        if (clock_settime(CLOCK_REALTIME, &ts)) {
-            avs_log(zephyr_demo, WARNING, "Failed to set time");
-        }
     }
 }
 
@@ -256,22 +267,11 @@ void main(void) {
     avs_log_set_default_level(DEFAULT_LOG_LEVEL);
 
     config_init();
-    disco_led_init();
-
+    led_init();
     initialize_network();
-
-    const char *dns_servers[] = { "8.8.8.8", NULL };
-    if (dns_resolve_init(dns_resolve_get_default(), dns_servers, NULL)) {
-        avs_log(zephyr_demo, ERROR, "DNS resolver init fail");
-        while (true) {
-        }
-    }
-
-#ifdef CONFIG_BOARD_DISCO_L475_IOT1
     synchronize_clock();
-#endif // CONFIG_BOARD_DISCO_L475_IOT1
 
-    struct device *entropy_dev =
+    const struct device *entropy_dev =
             device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
     if (!entropy_dev) {
         avs_log(zephyr_demo, ERROR, "Failed to acquire entropy device");
@@ -280,7 +280,8 @@ void main(void) {
     }
 
     avs_crypto_prng_ctx_t *prng_ctx =
-            avs_crypto_prng_new(entropy_callback, entropy_dev);
+            avs_crypto_prng_new(entropy_callback,
+                                (void *) (intptr_t) entropy_dev);
 
     if (!prng_ctx) {
         avs_log(zephyr_demo, ERROR, "Failed to initialize PRNG ctx");
@@ -338,8 +339,11 @@ void main(void) {
         goto cleanup;
     }
 
+    const bool bootstrap = config_is_bootstrap();
+
     const anjay_security_instance_t security_instance = {
         .ssid = 1,
+        .bootstrap_server = bootstrap,
         .server_uri = config_get_server_uri(),
         .security_mode = ANJAY_SECURITY_PSK,
         .public_cert_or_psk_identity = config.endpoint_name,
@@ -360,14 +364,19 @@ void main(void) {
     };
 
     anjay_iid_t security_instance_id = ANJAY_ID_INVALID;
-    anjay_iid_t server_instance_id = ANJAY_ID_INVALID;
     if (anjay_security_object_add_instance(ANJAY, &security_instance,
-                                           &security_instance_id)
-            || anjay_server_object_add_instance(ANJAY, &server_instance,
-                                                &server_instance_id)) {
-        avs_log(zephyr_demo, ERROR,
-                "Failed to instantiate Security or Server object");
+                                           &security_instance_id)) {
+        avs_log(zephyr_demo, ERROR, "Failed to instantiate Security object");
         goto cleanup;
+    }
+
+    if (!bootstrap) {
+        anjay_iid_t server_instance_id = ANJAY_ID_INVALID;
+        if (anjay_server_object_add_instance(ANJAY, &server_instance,
+                                             &server_instance_id)) {
+            avs_log(zephyr_demo, ERROR, "Failed to instantiate Server object");
+            goto cleanup;
+        }
     }
 
     k_thread_create(&UPDATE_OBJECTS_THREAD, UPDATE_OBJECTS_STACK,

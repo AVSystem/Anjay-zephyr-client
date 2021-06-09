@@ -1,4 +1,4 @@
-# Copyright 2020 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,9 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.13.1)
-include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
-project(anjay_zephyr)
+set(BOARD "disco_l475_iot1")
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+
+project(anjay_zephyr_disco_l475_iot1_client)
 
 include(../../CMakeLists.txt)

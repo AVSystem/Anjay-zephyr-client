@@ -1,3 +1,0 @@
-[submodule "deps/anjay"]
-	path = deps/anjay
-	url = https://github.com/AVSystem/Anjay.git

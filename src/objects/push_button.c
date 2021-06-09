@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@
 typedef struct push_button_instance_struct {
     anjay_iid_t iid;
 
-    struct device *dev;
+    const struct device *dev;
     struct gpio_callback push_button_callback;
     int gpio_pin;
 
@@ -74,8 +74,9 @@ typedef struct push_button_object_struct {
     AVS_LIST(push_button_instance_t) instances;
 } push_button_object_t;
 
-static void
-button_pressed(struct device *dev, struct gpio_callback *cb, uint32_t pins) {
+static void button_pressed(const struct device *dev,
+                           struct gpio_callback *cb,
+                           uint32_t pins) {
     push_button_instance_t *inst =
             AVS_CONTAINER_OF(cb, push_button_instance_t, push_button_callback);
     inst->digital_input_counter++;
@@ -197,7 +198,7 @@ static int configure_push_button(push_button_object_t *obj,
                                  int gpio_pin,
                                  int gpio_flags,
                                  anjay_iid_t iid) {
-    struct device *dev = device_get_binding(gpio_label);
+    const struct device *dev = device_get_binding(gpio_label);
     if (!dev || gpio_pin_configure(dev, gpio_pin, gpio_flags)
             || gpio_pin_interrupt_configure(dev, gpio_pin,
                                             GPIO_INT_EDGE_TO_ACTIVE)) {

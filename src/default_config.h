@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 #include <avsystem/commons/avs_log.h>
 
-#define CLIENT_VERSION "20.10"
+#define CLIENT_VERSION "21.06"
 
 #define DEFAULT_LOG_LEVEL AVS_LOG_INFO
 
@@ -31,5 +31,7 @@
 #define SERVER_URI "coaps://try-anjay.avsystem.com:5684"
 
 #define PSK_KEY "psk"
+
+#define BOOTSTRAP "n"
 
 #define NTP_SERVER "time.nist.gov"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 #include <assert.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <anjay/anjay.h>
 #include <avsystem/commons/avs_defs.h>
@@ -233,8 +234,10 @@ static int resource_write(anjay_t *anjay,
                 || clock_settime(CLOCK_REALTIME, &ts)) {
             return -1;
         }
-#endif // CONFIG_BOARD_DISCO_L475_IOT1
         return 0;
+#else  // CONFIG_BOARD_DISCO_L475_IOT1
+        return ANJAY_ERR_NOT_IMPLEMENTED;
+#endif // CONFIG_BOARD_DISCO_L475_IOT1
     }
     default:
         return ANJAY_ERR_METHOD_NOT_ALLOWED;

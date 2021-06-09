@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,10 +28,10 @@
 #define LED2_GPIO_PIN DT_GPIO_PIN(DT_ALIAS(led0), gpios)
 #define LED2_GPIO_FLAGS DT_GPIO_FLAGS(DT_ALIAS(led0), gpios)
 
-static struct device *LED1_DEVICE;
-static struct device *LED2_DEVICE;
+static const struct device *LED1_DEVICE;
+static const struct device *LED2_DEVICE;
 
-void disco_led_init(void) {
+void led_init(void) {
     LED1_DEVICE = device_get_binding(LED1_GPIO_PORT);
     if (!LED1_DEVICE
             || gpio_pin_configure(LED1_DEVICE, LED1_GPIO_PIN,
@@ -49,14 +49,14 @@ void disco_led_init(void) {
     }
 }
 
-static void led_set(disco_led_t led, int value) {
+static void led_set(led_t led, int value) {
     switch (led) {
-    case DISCO_LED1:
+    case LED1:
         if (LED1_DEVICE) {
             gpio_pin_set(LED1_DEVICE, LED1_GPIO_PIN, value);
         }
         break;
-    case DISCO_LED2:
+    case LED2:
         if (LED2_DEVICE) {
             gpio_pin_set(LED2_DEVICE, LED2_GPIO_PIN, value);
         }
@@ -64,22 +64,22 @@ static void led_set(disco_led_t led, int value) {
     }
 }
 
-void disco_led_on(disco_led_t led) {
+void led_on(led_t led) {
     led_set(led, 1);
 }
 
-void disco_led_off(disco_led_t led) {
+void led_off(led_t led) {
     led_set(led, 0);
 }
 
-void disco_led_toggle(disco_led_t led) {
+void led_toggle(led_t led) {
     switch (led) {
-    case DISCO_LED1:
+    case LED1:
         if (LED1_DEVICE) {
             gpio_pin_toggle(LED1_DEVICE, LED1_GPIO_PIN);
         }
         break;
-    case DISCO_LED2:
+    case LED2:
         if (LED2_DEVICE) {
             gpio_pin_toggle(LED2_DEVICE, LED2_GPIO_PIN);
         }

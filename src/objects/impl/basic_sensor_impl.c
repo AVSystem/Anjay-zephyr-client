@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -78,7 +78,7 @@ typedef struct basic_sensor_object_struct {
     const anjay_dm_object_def_t *def_ptr;
     anjay_dm_object_def_t def;
 
-    struct device *dev;
+    const struct device *dev;
     enum sensor_channel channel;
 
     float curr_value;
@@ -173,8 +173,9 @@ basic_sensor_resource_execute(anjay_t *anjay,
     }
 }
 
-static int
-get_value(struct device *dev, enum sensor_channel channel, float *out_value) {
+static int get_value(const struct device *dev,
+                     enum sensor_channel channel,
+                     float *out_value) {
     struct sensor_value value;
     if (sensor_sample_fetch_chan(dev, channel)
             || sensor_channel_get(dev, channel, &value)) {
@@ -191,7 +192,7 @@ basic_sensor_object_create(const char *name,
                            enum sensor_channel channel,
                            const char *unit,
                            anjay_oid_t oid) {
-    struct device *dev = device_get_binding(name);
+    const struct device *dev = device_get_binding(name);
     if (!dev) {
         return NULL;
     }
