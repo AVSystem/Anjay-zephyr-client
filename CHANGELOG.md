@@ -1,5 +1,23 @@
 # Changelog
 
+## 21.07 (Jul 30th, 2021)
+
+- Updated Anjay-zephyr to 2.13.0
+- Updated Zephyr to 2.6.0
+- Updated sdk-nrf to 1.6.0
+
+### Added
+- Moved client containing all features to demo folder
+- Minimal client example for qemu_x86
+- Support for Thingy:91 in demo application
+- Location object
+- Buzzer object
+
+### Improvements
+- Changed regulatory domain on eS-WiFi modem to World Wide
+- Sensor objects implementation depends on sensor presence, rather than
+  board name.
+
 ## 21.06 (Jun 7th, 2021)
 
 ### Added

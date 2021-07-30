@@ -1,0 +1,21 @@
+/ {
+    aliases {
+        temperature = &hts221;
+        humidity = &hts221;
+        accelerometer = &lsm6dsl;
+        magnetometer = &lis3mdl_magn;
+        barometer = &lps22hb_press;
+        distance = &vl53l0x;
+        gyrometer = &lsm6dsl;
+        push-button-0 = &user_button;
+        status-led = &green_led_1;
+    };
+};
+
+&i2c2 {
+    hts221: hts221@5f {};
+    lsm6dsl: lsm6dsl@6a {};
+    lis3mdl_magn: lis3mdl-magn@1e {};
+    lps22hb_press: lps22hb-press@5d {};
+    vl53l0x: vl53l0x@29 {};
+};

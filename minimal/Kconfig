@@ -1,0 +1,37 @@
+menu "anjay-zephyr-client"
+
+config ANJAY_CLIENT_DEVICE_MANUFACTURER
+    string "Device manufacturer"
+    default "Unknown"
+
+config ANJAY_CLIENT_MODEL_NUMBER
+    string "Model number"
+    default "Unknown"
+
+config ANJAY_CLIENT_ENDPOINT_NAME
+    string "Endpoint Name"
+    default "Anjay-zephyr-client"
+
+config ANJAY_CLIENT_VERSION
+    string "Client Version"
+    default "21.07"
+
+config ANJAY_CLIENT_SERVER_URI
+    string "Server URI"
+    default "coaps://lwm2m-test.avsystem.io:5684"
+
+config ANJAY_CLIENT_PSK_IDENTITY
+    string "PSK Identity"
+    default ANJAY_CLIENT_ENDPOINT_NAME
+
+config ANJAY_CLIENT_PSK_KEY
+    string "PSK Key"
+    default "test"
+
+config ANJAY_CLIENT_NTP_SERVER
+    string "NTP Server"
+    default "time.nist.gov"
+
+endmenu
+
+source "Kconfig.zephyr"

@@ -1,0 +1,18 @@
+menu "anjay-zephyr-client"
+
+config ANJAY_CLIENT_DEVICE_MANUFACTURER
+    string "Device manufacturer"
+    default "Unknown"
+
+config ANJAY_CLIENT_MODEL_NUMBER
+    string "Model number"
+    default "Unknown"
+
+config ANJAY_CLIENT_EXTERNAL_GPS_ANTENNA
+    bool "Use external GPS antenna"
+    default n
+    depends on BOARD_THINGY91_NRF9160NS || BOARD_NRF9160DK_NRF9160NS
+
+endmenu
+
+source "Kconfig.zephyr"
