@@ -21,17 +21,13 @@
 #include <kernel.h>
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
+#include <stdatomic.h>
 #include <stdlib.h>
 
 #include <anjay/anjay.h>
 
-extern struct k_mutex ANJAY_MTX;
-extern anjay_t *ANJAY;
-extern volatile bool ANJAY_RUNNING;
-
-#define SYNCHRONIZED(Mtx)                                          \
-    for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); \
-         !_synchronized_exit; _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))
+extern anjay_t *volatile ANJAY;
+extern volatile atomic_bool ANJAY_RUNNING;
 
 #define ANJAY_THREAD_PRIO 1
 #define ANJAY_THREAD_STACK_SIZE 4096

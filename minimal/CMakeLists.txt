@@ -19,7 +19,6 @@ set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
 
 set(app_common_sources
     src/main.c
-    src/common.h
     src/utils.c
     src/utils.h
     src/objects/objects.h

@@ -26,7 +26,7 @@
 #include <drivers/pwm.h>
 #include <zephyr.h>
 
-#include "../common.h"
+#include "../utils.h"
 #include "objects.h"
 
 /**
@@ -95,7 +95,7 @@ typedef struct buzzer_object_struct {
     buzzer_state_t backup;
 } buzzer_object_t;
 
-static const buzzer_state_t default_state = {
+static const buzzer_state_t DEFAULT_STATE = {
     .on_off = false,
     .delay_duration = 0.0,
     .minimum_off_time = 0.0,
@@ -179,7 +179,7 @@ static int instance_reset(anjay_t *anjay,
     assert(obj);
     assert(iid == 0);
 
-    obj->state = default_state;
+    obj->state = DEFAULT_STATE;
     return buzzer_reschedule(obj);
 }
 
@@ -379,7 +379,7 @@ const anjay_dm_object_def_t **buzzer_object_create(void) {
     obj->last_run_end_timestamp = TIMESTAMP_NONE;
     obj->running_infinitely = false;
 
-    obj->state = default_state;
+    obj->state = DEFAULT_STATE;
     if (buzzer_reschedule(obj)) {
         const anjay_dm_object_def_t **out_def = &obj->def;
         buzzer_object_release(&out_def);
@@ -410,7 +410,7 @@ void buzzer_object_release(const anjay_dm_object_def_t ***out_def) {
     const anjay_dm_object_def_t **def = *out_def;
     if (def) {
         buzzer_object_t *obj = get_obj(def);
-        obj->state = default_state;
+        obj->state = DEFAULT_STATE;
         buzzer_reschedule(obj);
         avs_free(obj);
         *out_def = NULL;

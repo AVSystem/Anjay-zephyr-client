@@ -8,10 +8,39 @@ config ANJAY_CLIENT_MODEL_NUMBER
     string "Model number"
     default "Unknown"
 
+config ANJAY_CLIENT_GPS_NRF
+    bool
+    default y
+    depends on BOARD_THINGY91_NRF9160NS || BOARD_NRF9160DK_NRF9160NS
+
 config ANJAY_CLIENT_EXTERNAL_GPS_ANTENNA
     bool "Use external GPS antenna"
     default n
     depends on BOARD_THINGY91_NRF9160NS || BOARD_NRF9160DK_NRF9160NS
+
+config ANJAY_CLIENT_GPS
+    bool
+    default y
+    depends on ANJAY_CLIENT_GPS_NRF
+
+config ANJAY_CLIENT_GPS_ALTITUDE
+    bool
+    default y
+    depends on ANJAY_CLIENT_GPS_NRF
+
+config ANJAY_CLIENT_GPS_RADIUS
+    bool
+    default y
+    depends on ANJAY_CLIENT_GPS_NRF
+
+config ANJAY_CLIENT_GPS_VELOCITY
+    bool
+    default n
+
+config ANJAY_CLIENT_GPS_SPEED
+    bool
+    default y
+    depends on ANJAY_CLIENT_GPS_NRF
 
 endmenu
 

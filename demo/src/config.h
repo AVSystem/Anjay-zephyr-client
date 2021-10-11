@@ -16,6 +16,10 @@
 
 #pragma once
 
+#include <stdint.h>
+
+#include <shell/shell.h>
+
 // To preserve backward compatibility, do not remove any of these and add new
 // options IDs right before _OPTION_STRING_END.
 typedef enum {
@@ -27,6 +31,10 @@ typedef enum {
     OPTION_EP_NAME,
     OPTION_PSK,
     OPTION_BOOTSTRAP,
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+    OPTION_GPS_NRF_PRIO_MODE_TIMEOUT,
+    OPTION_GPS_NRF_PRIO_MODE_COOLDOWN,
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
     _OPTION_STRING_END
 } option_id_t;
 
@@ -55,3 +63,9 @@ const char *config_get_server_uri(void);
 const char *config_get_psk(void);
 
 bool config_is_bootstrap(void);
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+uint32_t config_get_gps_nrf_prio_mode_timeout(void);
+
+uint32_t config_get_gps_nrf_prio_mode_cooldown(void);
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF

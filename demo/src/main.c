@@ -59,80 +59,17 @@ LOG_MODULE_REGISTER(anjay);
 #endif // CONFIG_BOARD_NRF9160DK_NRF9160NS ||
        // defined(CONFIG_BOARD_THINGY91_NRF9160NS)
 
-static const anjay_dm_object_def_t **TEMPERATURE_OBJ;
-static const anjay_dm_object_def_t **HUMIDITY_OBJ;
-static const anjay_dm_object_def_t **BAROMETER_OBJ;
-static const anjay_dm_object_def_t **ACCELEROMETER_OBJ;
-static const anjay_dm_object_def_t **DISTANCE_OBJ;
-static const anjay_dm_object_def_t **GYROMETER_OBJ;
-static const anjay_dm_object_def_t **MAGNETOMETER_OBJ;
 static const anjay_dm_object_def_t **BUZZER_OBJ;
 static const anjay_dm_object_def_t **LED_COLOR_LIGHT_OBJ;
 static const anjay_dm_object_def_t **LOCATION_OBJ;
 static const anjay_dm_object_def_t **SWITCH_OBJ;
-static const anjay_dm_object_def_t **PUSH_BUTTON_OBJ;
 static const anjay_dm_object_def_t **DEVICE_OBJ;
 
-anjay_t *ANJAY;
-K_MUTEX_DEFINE(ANJAY_MTX);
-volatile bool ANJAY_RUNNING = false;
-
-// main thread priority is 0 and 1 is the lower priority
-#define UPDATE_OBJECTS_THREAD_PRIO 2
-#define UPDATE_OBJECTS_THREAD_STACK_SIZE 2048
-
-static struct k_thread UPDATE_OBJECTS_THREAD;
-K_THREAD_STACK_DEFINE(UPDATE_OBJECTS_STACK, UPDATE_OBJECTS_THREAD_STACK_SIZE);
+anjay_t *volatile ANJAY;
+volatile atomic_bool ANJAY_RUNNING;
 
 struct k_thread ANJAY_THREAD;
 K_THREAD_STACK_DEFINE(ANJAY_STACK, ANJAY_THREAD_STACK_SIZE);
-
-void main_loop(void) {
-    while (ANJAY_RUNNING) {
-        SYNCHRONIZED(ANJAY_MTX) {
-            // Obtain all network data sources
-            AVS_LIST(avs_net_socket_t *const) sockets = NULL;
-            sockets = anjay_get_sockets(ANJAY);
-
-            // Prepare to poll() on them
-            size_t numsocks = AVS_LIST_SIZE(sockets);
-            struct pollfd pollfds[numsocks];
-            size_t i = 0;
-            AVS_LIST(avs_net_socket_t *const) sock;
-            AVS_LIST_FOREACH(sock, sockets) {
-                pollfds[i].fd = *(const int *) avs_net_socket_get_system(*sock);
-                pollfds[i].events = POLLIN;
-                pollfds[i].revents = 0;
-                ++i;
-            }
-
-            const int max_wait_time_ms = 1000;
-            // Determine the expected time to the next job in milliseconds.
-            // If there is no job we will wait till something arrives for
-            // at most 1 second (i.e. max_wait_time_ms).
-            int wait_ms = max_wait_time_ms;
-            wait_ms =
-                    anjay_sched_calculate_wait_time_ms(ANJAY, max_wait_time_ms);
-
-            // Wait for the events if necessary, and handle them.
-            if (poll(pollfds, numsocks, wait_ms) > 0) {
-                int socket_id = 0;
-                AVS_LIST(avs_net_socket_t *const) socket = NULL;
-                AVS_LIST_FOREACH(socket, sockets) {
-                    if (pollfds[socket_id].revents) {
-                        if (anjay_serve(ANJAY, *socket)) {
-                            avs_log(zephyr_demo, ERROR, "anjay_serve failed");
-                        }
-                    }
-                    ++socket_id;
-                }
-            }
-
-            // Finally run the scheduler
-            anjay_sched_run(ANJAY);
-        }
-    }
-}
 
 static void
 log_handler(avs_log_level_t level, const char *module, const char *message) {
@@ -197,103 +134,63 @@ void synchronize_clock(void) {
     }
 }
 
-static int register_objects(void) {
+static int register_objects(anjay_t *anjay) {
     if (!(DEVICE_OBJ = device_object_create())
-            || anjay_register_object(ANJAY, DEVICE_OBJ)) {
+            || anjay_register_object(anjay, DEVICE_OBJ)) {
         return -1;
     }
 
-    if ((TEMPERATURE_OBJ = temperature_object_create())) {
-        anjay_register_object(ANJAY, TEMPERATURE_OBJ);
-    }
-    if ((HUMIDITY_OBJ = humidity_object_create())) {
-        anjay_register_object(ANJAY, HUMIDITY_OBJ);
-    }
-    if ((DISTANCE_OBJ = distance_object_create())) {
-        anjay_register_object(ANJAY, DISTANCE_OBJ);
-    }
-    if ((BAROMETER_OBJ = barometer_object_create())) {
-        anjay_register_object(ANJAY, BAROMETER_OBJ);
-    }
-    if ((ACCELEROMETER_OBJ = accelerometer_object_create())) {
-        anjay_register_object(ANJAY, ACCELEROMETER_OBJ);
-    }
-    if ((GYROMETER_OBJ = gyrometer_object_create())) {
-        anjay_register_object(ANJAY, GYROMETER_OBJ);
-    }
-    if ((MAGNETOMETER_OBJ = magnetometer_object_create())) {
-        anjay_register_object(ANJAY, MAGNETOMETER_OBJ);
-    }
+    basic_sensors_install(anjay);
+    three_axis_sensors_install(anjay);
+    push_button_object_install(anjay);
+
     if ((BUZZER_OBJ = buzzer_object_create())) {
-        anjay_register_object(ANJAY, BUZZER_OBJ);
+        anjay_register_object(anjay, BUZZER_OBJ);
     }
     if ((LED_COLOR_LIGHT_OBJ = led_color_light_object_create())) {
-        anjay_register_object(ANJAY, LED_COLOR_LIGHT_OBJ);
+        anjay_register_object(anjay, LED_COLOR_LIGHT_OBJ);
     }
     if ((LOCATION_OBJ = location_object_create())) {
-        anjay_register_object(ANJAY, LOCATION_OBJ);
-    }
-    if ((PUSH_BUTTON_OBJ = push_button_object_create())) {
-        anjay_register_object(ANJAY, PUSH_BUTTON_OBJ);
+        anjay_register_object(anjay, LOCATION_OBJ);
     }
     if ((SWITCH_OBJ = switch_object_create())) {
-        anjay_register_object(ANJAY, SWITCH_OBJ);
+        anjay_register_object(anjay, SWITCH_OBJ);
     }
 
     return 0;
 }
 
-static void update_objects_frequent(void) {
-    device_object_update(ANJAY, DEVICE_OBJ);
-    push_button_object_update(ANJAY, PUSH_BUTTON_OBJ);
-    switch_object_update(ANJAY, SWITCH_OBJ);
-    buzzer_object_update(ANJAY, BUZZER_OBJ);
+static void update_objects_frequent(anjay_t *anjay) {
+    device_object_update(anjay, DEVICE_OBJ);
+    switch_object_update(anjay, SWITCH_OBJ);
+    buzzer_object_update(anjay, BUZZER_OBJ);
 }
 
-static void update_objects_periodic(void) {
-    temperature_object_update(ANJAY, TEMPERATURE_OBJ);
-    humidity_object_update(ANJAY, HUMIDITY_OBJ);
-    barometer_object_update(ANJAY, BAROMETER_OBJ);
-    accelerometer_object_update(ANJAY, ACCELEROMETER_OBJ);
-    distance_object_update(ANJAY, DISTANCE_OBJ);
-    gyrometer_object_update(ANJAY, GYROMETER_OBJ);
-    magnetometer_object_update(ANJAY, MAGNETOMETER_OBJ);
-    location_object_update(ANJAY, LOCATION_OBJ);
+static void update_objects_periodic(anjay_t *anjay) {
+    basic_sensors_update(anjay);
+    three_axis_sensors_update(anjay);
+    location_object_update(anjay, LOCATION_OBJ);
 }
 
-void update_objects(void *arg1, void *arg2, void *arg3) {
-    (void) arg1;
-    (void) arg2;
-    (void) arg3;
+static void update_objects(avs_sched_t *sched, const void *anjay_ptr) {
+    anjay_t *anjay = *(anjay_t *const *) anjay_ptr;
 
-    assert(ANJAY);
+    static size_t cycle = 0;
 
-    size_t cycle = 0;
-    while (ANJAY_RUNNING) {
-        SYNCHRONIZED(ANJAY_MTX) {
-            update_objects_frequent();
-            if (cycle % 5 == 0) {
-                update_objects_periodic();
-            }
-        }
-
-        status_led_toggle();
-
-        cycle++;
-        k_sleep(K_SECONDS(1));
+    update_objects_frequent(anjay);
+    if (cycle % 5 == 0) {
+        update_objects_periodic(anjay);
     }
+
+    status_led_toggle();
+
+    cycle++;
+    AVS_SCHED_DELAYED(sched, NULL, avs_time_duration_from_scalar(1, AVS_TIME_S),
+                      update_objects, &anjay, sizeof(anjay));
 }
 
 static void release_objects(void) {
     device_object_release(&DEVICE_OBJ);
-    push_button_object_release(&PUSH_BUTTON_OBJ);
-    temperature_object_release(&TEMPERATURE_OBJ);
-    humidity_object_release(&HUMIDITY_OBJ);
-    barometer_object_release(&BAROMETER_OBJ);
-    accelerometer_object_release(&ACCELEROMETER_OBJ);
-    distance_object_release(&DISTANCE_OBJ);
-    gyrometer_object_release(&GYROMETER_OBJ);
-    magnetometer_object_release(&MAGNETOMETER_OBJ);
     buzzer_object_release(&BUZZER_OBJ);
     led_color_light_object_release(&LED_COLOR_LIGHT_OBJ);
     switch_object_release(&SWITCH_OBJ);
@@ -343,7 +240,7 @@ void initialize_network(void) {
 
 static avs_crypto_prng_ctx_t *PRNG_CTX;
 
-static int initialize_anjay(void) {
+static anjay_t *initialize_anjay(void) {
     const anjay_configuration_t config = {
         .endpoint_name = config_get_endpoint_name(),
         .in_buffer_size = 4000,
@@ -351,22 +248,22 @@ static int initialize_anjay(void) {
         .prng_ctx = PRNG_CTX
     };
 
-    ANJAY = anjay_new(&config);
-    if (!ANJAY) {
+    anjay_t *anjay = anjay_new(&config);
+    if (!anjay) {
         avs_log(zephyr_demo, ERROR, "Could not create Anjay object");
-        return -1;
+        return NULL;
     }
 
-    if (anjay_attr_storage_install(ANJAY)
-            || anjay_security_object_install(ANJAY)
-            || anjay_server_object_install(ANJAY)) {
+    if (anjay_attr_storage_install(anjay)
+            || anjay_security_object_install(anjay)
+            || anjay_server_object_install(anjay)) {
         avs_log(zephyr_demo, ERROR, "Failed to install necessary modules");
-        return -1;
+        goto error;
     }
 
-    if (register_objects()) {
+    if (register_objects(anjay)) {
         avs_log(zephyr_demo, ERROR, "Failed to initialize objects");
-        return -1;
+        goto error;
     }
 
     const bool bootstrap = config_is_bootstrap();
@@ -394,22 +291,26 @@ static int initialize_anjay(void) {
     };
 
     anjay_iid_t security_instance_id = ANJAY_ID_INVALID;
-    if (anjay_security_object_add_instance(ANJAY, &security_instance,
+    if (anjay_security_object_add_instance(anjay, &security_instance,
                                            &security_instance_id)) {
         avs_log(zephyr_demo, ERROR, "Failed to instantiate Security object");
-        return -1;
+        goto error;
     }
 
     if (!bootstrap) {
         anjay_iid_t server_instance_id = ANJAY_ID_INVALID;
-        if (anjay_server_object_add_instance(ANJAY, &server_instance,
+        if (anjay_server_object_add_instance(anjay, &server_instance,
                                              &server_instance_id)) {
             avs_log(zephyr_demo, ERROR, "Failed to instantiate Server object");
-            return -1;
+            goto error;
         }
     }
 
-    return 0;
+    return anjay;
+error:
+    anjay_delete(anjay);
+    release_objects();
+    return NULL;
 }
 
 void run_anjay(void *arg1, void *arg2, void *arg3) {
@@ -417,35 +318,20 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
     ARG_UNUSED(arg2);
     ARG_UNUSED(arg3);
 
-    int err = -1;
-    SYNCHRONIZED(ANJAY_MTX) {
-        err = initialize_anjay();
+    anjay_t *anjay = initialize_anjay();
+    if (!anjay) {
+        return;
     }
-    if (err) {
-        goto cleanup;
-    }
-
-    k_thread_create(&UPDATE_OBJECTS_THREAD, UPDATE_OBJECTS_STACK,
-                    UPDATE_OBJECTS_THREAD_STACK_SIZE, update_objects, NULL,
-                    NULL, NULL, UPDATE_OBJECTS_THREAD_PRIO, 0, K_NO_WAIT);
-
-#if defined(CONFIG_THREAD_ANALYZER) && defined(CONFIG_THREAD_NAME)
-    k_thread_name_set((k_tid_t) &UPDATE_OBJECTS_THREAD, "update_objects");
-#endif // defined(CONFIG_THREAD_ANALYZER) && defined(CONFIG_THREAD_NAME)
 
     avs_log(zephyr_demo, INFO, "Successfully created thread");
 
-    main_loop();
+    ANJAY = anjay;
+    update_objects(anjay_get_scheduler(anjay), &anjay);
+    anjay_event_loop_run(ANJAY, avs_time_duration_from_scalar(1, AVS_TIME_S));
+    ANJAY = NULL;
 
-cleanup:
-    SYNCHRONIZED(ANJAY_MTX) {
-        if (ANJAY) {
-            anjay_delete(ANJAY);
-            ANJAY = NULL;
-        }
-
-        release_objects();
-    }
+    anjay_delete(anjay);
+    release_objects();
 }
 
 void main(void) {
@@ -458,9 +344,9 @@ void main(void) {
 
     initialize_network();
 
-#if GPS_AVAILABLE
+#ifdef CONFIG_ANJAY_CLIENT_GPS
     initialize_gps();
-#endif // GPS_AVAILABLE
+#endif // CONFIG_ANJAY_CLIENT_GPS
 
     synchronize_clock();
 
@@ -479,10 +365,10 @@ void main(void) {
         exit(1);
     }
 
-    ANJAY_RUNNING = true;
+    atomic_store(&ANJAY_RUNNING, true);
 
     while (true) {
-        if (ANJAY_RUNNING) {
+        if (atomic_load(&ANJAY_RUNNING)) {
             k_thread_create(&ANJAY_THREAD, ANJAY_STACK, ANJAY_THREAD_STACK_SIZE,
                             run_anjay, NULL, NULL, NULL, ANJAY_THREAD_PRIO, 0,
                             K_NO_WAIT);

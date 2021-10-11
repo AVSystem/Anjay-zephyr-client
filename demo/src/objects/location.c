@@ -29,8 +29,8 @@
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include "../common.h"
 #include "../gps.h"
+#include "../utils.h"
 #include "objects.h"
 
 /**
@@ -89,7 +89,7 @@
  */
 #define RID_SPEED 6
 
-#if GPS_AVAILABLE
+#ifdef CONFIG_ANJAY_CLIENT_GPS
 typedef struct location_object_struct {
     const anjay_dm_object_def_t *def;
     gps_data_t cached_read;
@@ -112,23 +112,23 @@ static int list_resources(anjay_t *anjay,
     anjay_dm_emit_res(ctx, RID_LATITUDE, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
     anjay_dm_emit_res(ctx, RID_LONGITUDE, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
 
-#    if GPS_ALTITUDE_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
     anjay_dm_emit_res(ctx, RID_ALTITUDE, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
-#    endif // GPS_ALTITUDE_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
 
-#    if GPS_RADIUS_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_RADIUS
     anjay_dm_emit_res(ctx, RID_RADIUS, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
-#    endif // GPS_RADIUS_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_RADIUS
 
-#    if GPS_VELOCITY_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_VELOCITY
     anjay_dm_emit_res(ctx, RID_VELOCITY, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
-#    endif // GPS_VELOCITY_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_VELOCITY
 
     anjay_dm_emit_res(ctx, RID_TIMESTAMP, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
 
-#    if GPS_SPEED_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_SPEED
     anjay_dm_emit_res(ctx, RID_SPEED, ANJAY_DM_RES_R, ANJAY_DM_RES_PRESENT);
-#    endif // GPS_SPEED_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_SPEED
     return 0;
 }
 
@@ -161,32 +161,32 @@ static int resource_read(anjay_t *anjay,
         assert(riid == ANJAY_ID_INVALID);
         return anjay_ret_double(ctx, obj->cached_read.longitude);
 
-#    if GPS_ALTITUDE_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
     case RID_ALTITUDE:
         assert(riid == ANJAY_ID_INVALID);
         return anjay_ret_double(ctx, obj->cached_read.altitude);
-#    endif // GPS_ALTITUDE_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
 
-#    if GPS_RADIUS_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_RADIUS
     case RID_RADIUS:
         assert(riid == ANJAY_ID_INVALID);
         return anjay_ret_double(ctx, obj->cached_read.radius);
-#    endif // GPS_RADIUS_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_RADIUS
 
-#    if GPS_VELOCITY_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_VELOCITY
     case RID_VELOCITY:
 // TODO: implement velocity binary format as in 3GPP-TS_23.032
 #        error "velocity binary format not implemented yet"
 
         assert(riid == ANJAY_ID_INVALID);
         return anjay_ret_bytes(ctx, "", 0);
-#    endif // GPS_VELOCITY_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_VELOCITY
 
-#    if GPS_SPEED_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_SPEED
     case RID_SPEED:
         assert(riid == ANJAY_ID_INVALID);
         return anjay_ret_double(ctx, obj->cached_read.speed);
-#    endif // GPS_SPEED_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_SPEED
 
     default:
         return ANJAY_ERR_METHOD_NOT_ALLOWED;
@@ -232,18 +232,18 @@ void location_object_update(anjay_t *anjay,
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_TIMESTAMP);
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_LATITUDE);
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_LONGITUDE);
-#    if GPS_ALTITUDE_AVAILABLE
+#    if CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_ALTITUDE);
-#    endif // GPS_ALTITUDE_AVAILABLE
-#    if GPS_RADIUS_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
+#    if CONFIG_ANJAY_CLIENT_GPS_RADIUS
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_RADIUS);
-#    endif // GPS_RADIUS_AVAILABLE
-#    if GPS_VELOCITY_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_RADIUS
+#    if CONFIG_ANJAY_CLIENT_GPS_VELOCITY
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_VELOCITY);
-#    endif // GPS_VELOCITY_AVAILABLE
-#    if GPS_SPEED_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_VELOCITY
+#    if CONFIG_ANJAY_CLIENT_GPS_SPEED
     anjay_notify_changed(anjay, obj->def->oid, 0, RID_SPEED);
-#    endif // GPS_SPEED_AVAILABLE
+#    endif // CONFIG_ANJAY_CLIENT_GPS_SPEED
 }
 
 void location_object_release(const anjay_dm_object_def_t ***out_def) {
@@ -254,7 +254,7 @@ void location_object_release(const anjay_dm_object_def_t ***out_def) {
         *out_def = NULL;
     }
 }
-#else  // GPS_AVAILABLE
+#else  // CONFIG_ANJAY_CLIENT_GPS
 const anjay_dm_object_def_t **location_object_create(void) {
     return NULL;
 }
@@ -268,4 +268,4 @@ void location_object_update(anjay_t *anjay,
 void location_object_release(const anjay_dm_object_def_t ***out_def) {
     (void) out_def;
 }
-#endif // GPS_AVAILABLE
+#endif // CONFIG_ANJAY_CLIENT_GPS

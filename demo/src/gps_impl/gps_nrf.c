@@ -28,7 +28,9 @@
 #include <zephyr.h>
 
 #include "../common.h"
+#include "../config.h"
 #include "../gps.h"
+#include "../utils.h"
 
 LOG_MODULE_REGISTER(gps_nrf);
 
@@ -37,7 +39,7 @@ LOG_MODULE_REGISTER(gps_nrf);
 
 // Suggested GPS tuning parameters come from Nordic's SDK example
 // https://github.com/nrfconnect/sdk-nrf/blob/master/samples/nrf9160/gps/src/main.c
-static const char *const init_at_commands[] = {
+static const char *const INIT_AT_COMMANDS[] = {
 // AT%XMAGPIO controls antenna tuner
 #ifdef CONFIG_BOARD_THINGY91_NRF9160NS
     "AT%XMAGPIO=1,1,1,7,1,746,803,2,698,748,2,1710,2200,3,824,894,4,880,960,5,"
@@ -60,8 +62,7 @@ gps_data_t GPS_READ_LAST = {
     .valid = false
 };
 
-// for now, we try to achieve the fix in prio mode only once
-static bool prio_mode_tried = false;
+static int64_t prio_mode_cooldown_end_time = 0;
 static size_t interrupted_fixes_in_row = 0;
 K_MSGQ_DEFINE(incoming_pvt_msgq,
               sizeof(struct nrf_modem_gnss_pvt_data_frame),
@@ -92,16 +93,17 @@ gnss_datetime_to_timestamp(const struct nrf_modem_gnss_datetime *datetime) {
 void prio_mode_disable(void) {
     LOG_INF("Disabling gnss_prio_mode");
 
-    SYNCHRONIZED(ANJAY_MTX) {
-        if (ANJAY) {
-            anjay_transport_exit_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
-        }
-    }
+    // NOTE: anjay_transport_exit_offline() contains an internal null-guard
+    anjay_transport_exit_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
 
     if (nrf_modem_gnss_prio_mode_disable()) {
         LOG_ERR("Couldn't disable gnss_prio_mode");
         return;
     }
+
+    prio_mode_cooldown_end_time =
+            k_uptime_get()
+            + MSEC_PER_SEC * config_get_gps_nrf_prio_mode_cooldown();
 }
 
 static void incoming_pvt_work_handler(struct k_work *work) {
@@ -136,27 +138,30 @@ static void incoming_pvt_work_handler(struct k_work *work) {
             GPS_READ_LAST.speed = pvt.speed;
         }
     } else if (pvt.flags & NRF_MODEM_GNSS_PVT_FLAG_NOT_ENOUGH_WINDOW_TIME) {
-        if (++interrupted_fixes_in_row == INTERRUPTED_FIXES_WARN_THRESHOLD) {
+        if (k_uptime_get() > prio_mode_cooldown_end_time
+                && ++interrupted_fixes_in_row
+                               == INTERRUPTED_FIXES_WARN_THRESHOLD) {
             interrupted_fixes_in_row = 0;
-            if (!prio_mode_tried) {
-                LOG_WRN("GPS was interrupted multiple times by the LTE modem "
-                        "when producing a fix. Enabling gnss_prio_mode.");
+            LOG_WRN("GPS was interrupted multiple times by the LTE modem when "
+                    "producing a fix");
 
-                if (nrf_modem_gnss_prio_mode_enable()) {
-                    LOG_ERR("Couldn't enable gnss_prio_mode");
-                    return;
-                }
-
-                SYNCHRONIZED(ANJAY_MTX) {
-                    if (ANJAY) {
-                        anjay_transport_enter_offline(ANJAY,
-                                                      ANJAY_TRANSPORT_SET_IP);
-                    }
-                }
-
-                prio_mode_tried = true;
-                k_work_schedule(&prio_mode_disable_dwork, PRIO_MODE_TIMEOUT);
+            uint32_t gps_prio_mode_timeout =
+                    config_get_gps_nrf_prio_mode_timeout();
+            if (gps_prio_mode_timeout == 0) {
+                return;
             }
+
+            if (nrf_modem_gnss_prio_mode_enable()) {
+                LOG_ERR("Couldn't enable gnss_prio_mode");
+                return;
+            }
+            LOG_WRN("gnss_prio_mode enabled");
+
+            // NOTE: anjay_transport_enter_offline() contains a null-guard
+            anjay_transport_enter_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
+
+            k_work_schedule(&prio_mode_disable_dwork,
+                            K_SECONDS(gps_prio_mode_timeout));
         }
     }
 }
@@ -180,10 +185,10 @@ static void gnss_event_handler(int event) {
 }
 
 static int config_at(void) {
-    for (size_t i = 0; i < ARRAY_SIZE(init_at_commands); i++) {
-        if (at_cmd_write(init_at_commands[i], NULL, 0, NULL)) {
+    for (size_t i = 0; i < ARRAY_SIZE(INIT_AT_COMMANDS); i++) {
+        if (at_cmd_write(INIT_AT_COMMANDS[i], NULL, 0, NULL)) {
             LOG_ERR("Failed to write initial AT command: %s",
-                    init_at_commands[i]);
+                    INIT_AT_COMMANDS[i]);
             return -1;
         }
     }

@@ -16,9 +16,10 @@
 
 #pragma once
 
+#include <autoconf.h>
 #include <avsystem/commons/avs_log.h>
 
-#define CLIENT_VERSION "21.07"
+#define CLIENT_VERSION "21.10"
 
 #define DEFAULT_LOG_LEVEL AVS_LOG_INFO
 
@@ -33,5 +34,11 @@
 #define PSK_KEY "psk"
 
 #define BOOTSTRAP "n"
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+#    define GPS_NRF_PRIO_MODE_TIMEOUT "300"
+
+#    define GPS_NRF_PRIO_MODE_COOLDOWN "1800"
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 
 #define NTP_SERVER "time.nist.gov"

@@ -12,7 +12,7 @@ The following LwM2M Objects are supported:
 
 | Target         | Objects                                                                                                                                                |
 |----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Common         | Security (/0)<br>Server (/1)<br>Access Control (/2)<br>Device (/3)<br>Push button (/3347)                                                              |
+| Common         | Security (/0)<br>Server (/1)<br>Device (/3)<br>Push button (/3347)                                                                                     |
 | B-L475E-IOT01A | Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334) |
 | nRF9160DK      | Location (/6)<br>On/Off switch (/3342)                                                                                                                 |
 | Thingy:91      | Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420)    |

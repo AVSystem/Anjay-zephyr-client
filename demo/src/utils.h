@@ -22,3 +22,7 @@ typedef struct {
 } device_id_t;
 
 int get_device_id(device_id_t *out_id);
+
+#define SYNCHRONIZED(Mtx)                                          \
+    for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); \
+         !_synchronized_exit; _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))

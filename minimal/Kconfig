@@ -14,11 +14,11 @@ config ANJAY_CLIENT_ENDPOINT_NAME
 
 config ANJAY_CLIENT_VERSION
     string "Client Version"
-    default "21.07"
+    default "21.10"
 
 config ANJAY_CLIENT_SERVER_URI
     string "Server URI"
-    default "coaps://lwm2m-test.avsystem.io:5684"
+    default "coaps://try-anjay.avsystem.com:5684"
 
 config ANJAY_CLIENT_PSK_IDENTITY
     string "PSK Identity"
@@ -32,6 +32,15 @@ config ANJAY_CLIENT_NTP_SERVER
     string "NTP Server"
     default "time.nist.gov"
 
+if WIFI
+    config ANJAY_CLIENT_WIFI_SSID
+        string "Wifi SSID"
+        default "ssid"
+
+    config ANJAY_CLIENT_WIFI_PASSWORD
+        string "Wifi password"
+        default "password"
+endif
 endmenu
 
 source "Kconfig.zephyr"

@@ -18,8 +18,10 @@
 #include <stdbool.h>
 
 #include <anjay/anjay.h>
+#include <anjay/ipso_objects.h>
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_list.h>
+#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_memory.h>
 
 #include <devicetree.h>
@@ -27,289 +29,142 @@
 
 #include "objects.h"
 
-/**
- * Digital Input State: R, Single, Mandatory
- * type: boolean, range: N/A, unit: N/A
- * The current state of a digital input.
- */
-#define RID_DIGITAL_INPUT_STATE 5500
-
-/**
- * Digital Input Counter: R, Single, Optional
- * type: integer, range: N/A, unit: N/A
- * The cumulative value of active state detected.
- */
-#define RID_DIGITAL_INPUT_COUNTER 5501
-
 #if PUSH_BUTTON_AVAILABLE_ANY
-typedef struct push_button_instance_struct {
-    anjay_iid_t iid;
-
+typedef struct {
+    anjay_t *anjay;
     const struct device *dev;
-    struct gpio_callback push_button_callback;
     int gpio_pin;
+    int gpio_flags;
+    struct gpio_callback push_button_callback;
+} push_button_instance_glue_t;
 
-    bool digital_input_state;
-    int digital_input_counter;
-    bool digital_input_counter_changed;
-} push_button_instance_t;
-
-typedef struct push_button_object_struct {
-    const anjay_dm_object_def_t *def;
-    AVS_LIST(push_button_instance_t) instances;
-} push_button_object_t;
-
-static void button_pressed(const struct device *dev,
-                           struct gpio_callback *cb,
-                           uint32_t pins) {
-    push_button_instance_t *inst =
-            AVS_CONTAINER_OF(cb, push_button_instance_t, push_button_callback);
-    inst->digital_input_counter++;
-    inst->digital_input_counter_changed = true;
-}
-
-static inline push_button_object_t *
-get_obj(const anjay_dm_object_def_t *const *obj_ptr) {
-    assert(obj_ptr);
-    return AVS_CONTAINER_OF(obj_ptr, push_button_object_t, def);
-}
-
-static push_button_instance_t *find_instance(const push_button_object_t *obj,
-                                             anjay_iid_t iid) {
-    AVS_LIST(push_button_instance_t) it;
-    AVS_LIST_FOREACH(it, obj->instances) {
-        if (it->iid == iid) {
-            return it;
-        } else if (it->iid > iid) {
-            break;
+#    define PUSH_BUTTON_GLUE_ITEM(num)                                         \
+        {                                                                      \
+            .dev = DEVICE_DT_GET(DT_GPIO_CTLR(PUSH_BUTTON_NODE(num), gpios)),  \
+            .gpio_pin = DT_GPIO_PIN(PUSH_BUTTON_NODE(num), gpios),             \
+            .gpio_flags =                                                      \
+                    (GPIO_INPUT | DT_GPIO_FLAGS(PUSH_BUTTON_NODE(num), gpios)) \
         }
-    }
-    return NULL;
+
+static push_button_instance_glue_t BUTTON_GLUE[] = {
+#    if PUSH_BUTTON_AVAILABLE(0)
+    PUSH_BUTTON_GLUE_ITEM(0),
+#    endif // PUSH_BUTTON_AVAILABLE(0)
+#    if PUSH_BUTTON_AVAILABLE(1)
+    PUSH_BUTTON_GLUE_ITEM(1),
+#    endif // PUSH_BUTTON_AVAILABLE(1)
+#    if PUSH_BUTTON_AVAILABLE(2)
+    PUSH_BUTTON_GLUE_ITEM(2),
+#    endif // PUSH_BUTTON_AVAILABLE(2)
+};
+
+#    define BUTTON_CHANGE_WORKS_NUM 256
+
+typedef struct {
+    bool reserved;
+    struct k_work work;
+    anjay_t *anjay;
+    anjay_iid_t iid;
+    bool state;
+} change_button_state_work_t;
+
+static change_button_state_work_t button_change_works[BUTTON_CHANGE_WORKS_NUM];
+static size_t LAST_WORK_SLOT = 0;
+
+static void button_change_state_handler(struct k_work *_work) {
+    change_button_state_work_t *work =
+            CONTAINER_OF(_work, change_button_state_work_t, work);
+    anjay_ipso_button_update(work->anjay, work->iid, work->state);
+    work->reserved = false;
 }
 
-static int list_instances(anjay_t *anjay,
-                          const anjay_dm_object_def_t *const *obj_ptr,
-                          anjay_dm_list_ctx_t *ctx) {
-    (void) anjay;
+static void button_state_changed(const struct device *dev,
+                                 struct gpio_callback *cb,
+                                 uint32_t pins) {
+    (void) pins;
+    push_button_instance_glue_t *glue =
+            AVS_CONTAINER_OF(cb, push_button_instance_glue_t,
+                             push_button_callback);
+    change_button_state_work_t *work = NULL;
+    for (int i = 0; i < BUTTON_CHANGE_WORKS_NUM; i++) {
+        int slot_num = (LAST_WORK_SLOT + i + 1) % BUTTON_CHANGE_WORKS_NUM;
 
-    AVS_LIST(push_button_instance_t) it;
-    AVS_LIST_FOREACH(it, get_obj(obj_ptr)->instances) {
-        anjay_dm_emit(ctx, it->iid);
-    }
+        if (!button_change_works[slot_num].reserved) {
+            LAST_WORK_SLOT = slot_num;
 
-    return 0;
-}
+            work = &button_change_works[slot_num];
+            work->reserved = true;
+            work->anjay = glue->anjay;
+            work->state = (bool) gpio_pin_get(dev, glue->gpio_pin);
+            work->iid = (anjay_iid_t) (((size_t) (glue - BUTTON_GLUE))
+                                       / sizeof(push_button_instance_glue_t));
 
-static int init_instance(push_button_instance_t *inst, anjay_iid_t iid) {
-    assert(iid != ANJAY_ID_INVALID);
+            k_work_init(&work->work, button_change_state_handler);
 
-    inst->iid = iid;
-    inst->digital_input_counter = 0;
-    inst->digital_input_counter_changed = false;
-    return 0;
-}
-
-static int list_resources(anjay_t *anjay,
-                          const anjay_dm_object_def_t *const *obj_ptr,
-                          anjay_iid_t iid,
-                          anjay_dm_resource_list_ctx_t *ctx) {
-    (void) anjay;
-    (void) obj_ptr;
-    (void) iid;
-
-    anjay_dm_emit_res(ctx, RID_DIGITAL_INPUT_STATE, ANJAY_DM_RES_R,
-                      ANJAY_DM_RES_PRESENT);
-    anjay_dm_emit_res(ctx, RID_DIGITAL_INPUT_COUNTER, ANJAY_DM_RES_R,
-                      ANJAY_DM_RES_PRESENT);
-    return 0;
-}
-
-static int resource_read(anjay_t *anjay,
-                         const anjay_dm_object_def_t *const *obj_ptr,
-                         anjay_iid_t iid,
-                         anjay_rid_t rid,
-                         anjay_riid_t riid,
-                         anjay_output_ctx_t *ctx) {
-    (void) anjay;
-
-    push_button_object_t *obj = get_obj(obj_ptr);
-    assert(obj);
-    push_button_instance_t *inst = find_instance(obj, iid);
-    assert(inst);
-
-    switch (rid) {
-    case RID_DIGITAL_INPUT_STATE:
-        assert(riid == ANJAY_ID_INVALID);
-        return anjay_ret_bool(ctx, inst->digital_input_state);
-
-    case RID_DIGITAL_INPUT_COUNTER:
-        assert(riid == ANJAY_ID_INVALID);
-        return anjay_ret_i32(ctx, inst->digital_input_counter);
-
-    default:
-        return ANJAY_ERR_METHOD_NOT_ALLOWED;
-    }
-}
-
-static push_button_instance_t *add_instance(push_button_object_t *obj,
-                                            anjay_iid_t iid) {
-    assert(find_instance(obj, iid) == NULL);
-
-    AVS_LIST(push_button_instance_t) created =
-            AVS_LIST_NEW_ELEMENT(push_button_instance_t);
-    if (!created) {
-        return NULL;
-    }
-
-    int result = init_instance(created, iid);
-    if (result) {
-        AVS_LIST_CLEAR(&created);
-        return NULL;
-    }
-
-    AVS_LIST(push_button_instance_t) *ptr;
-    AVS_LIST_FOREACH_PTR(ptr, &obj->instances) {
-        if ((*ptr)->iid > created->iid) {
-            break;
+            if (k_work_submit(&work->work) == 1) {
+                return;
+            } else {
+                break;
+            }
         }
     }
 
-    AVS_LIST_INSERT(ptr, created);
-    return created;
+    avs_log(push_button, ERROR, "Could not schedule the work");
 }
 
-static int configure_push_button(push_button_object_t *obj,
+static int configure_push_button(anjay_t *anjay,
                                  const struct device *dev,
                                  int gpio_pin,
                                  int gpio_flags,
-                                 anjay_iid_t iid) {
+                                 anjay_iid_t iid,
+                                 push_button_instance_glue_t *glue) {
     if (!device_is_ready(dev) || gpio_pin_configure(dev, gpio_pin, gpio_flags)
             || gpio_pin_interrupt_configure(dev, gpio_pin,
-                                            GPIO_INT_EDGE_TO_ACTIVE)) {
+                                            GPIO_INT_EDGE_BOTH)) {
         return -1;
     }
 
-    AVS_LIST(push_button_instance_t) inst = add_instance(obj, iid);
-    if (inst) {
-        inst->dev = dev;
-        inst->digital_input_state = gpio_pin_get(inst->dev, gpio_pin);
-        inst->gpio_pin = gpio_pin;
-    } else {
+    char application_type[40];
+    sprintf(application_type, "Button %d", iid);
+    if (anjay_ipso_button_instance_add(anjay, iid, application_type)) {
         return -1;
     }
 
-    gpio_init_callback(&inst->push_button_callback, button_pressed,
+    (void) anjay_ipso_button_update(anjay, iid, gpio_pin_get(dev, gpio_pin));
+
+    gpio_init_callback(&glue->push_button_callback, button_state_changed,
                        BIT(gpio_pin));
-    if (gpio_add_callback(inst->dev, &inst->push_button_callback)) {
-        gpio_pin_interrupt_configure(inst->dev, inst->gpio_pin,
-                                     GPIO_INT_DISABLE);
-        AVS_LIST_DELETE(&inst);
+    glue->anjay = anjay;
+
+    if (gpio_add_callback(dev, &glue->push_button_callback)) {
+        gpio_pin_interrupt_configure(dev, gpio_pin, GPIO_INT_DISABLE);
+        anjay_ipso_button_instance_remove(anjay, iid);
         return -1;
     }
     return 0;
 }
 
-static const anjay_dm_object_def_t OBJ_DEF = {
-    .oid = 3347,
-    .handlers = {
-        .list_instances = list_instances,
-        .list_resources = list_resources,
-        .resource_read = resource_read
+int push_button_object_install(anjay_t *anjay) {
+    if (anjay_ipso_button_install(anjay, AVS_ARRAY_SIZE(BUTTON_GLUE))) {
+        return -1;
     }
-};
 
-static const anjay_dm_object_def_t *OBJ_DEF_PTR = &OBJ_DEF;
-
-void push_button_object_release(const anjay_dm_object_def_t ***out_def) {
-    const anjay_dm_object_def_t **def = *out_def;
-    if (def) {
-        push_button_object_t *obj = get_obj(def);
-        AVS_LIST_CLEAR(&obj->instances) {
-            gpio_pin_interrupt_configure(obj->instances->dev,
-                                         obj->instances->gpio_pin,
-                                         GPIO_INT_DISABLE);
-            gpio_remove_callback(obj->instances->dev,
-                                 &obj->instances->push_button_callback);
-        }
-        avs_free(obj);
-        *out_def = NULL;
+    for (anjay_iid_t iid = 0; iid < AVS_ARRAY_SIZE(BUTTON_GLUE); iid++) {
+        configure_push_button(anjay,
+                              BUTTON_GLUE[iid].dev,
+                              BUTTON_GLUE[iid].gpio_pin,
+                              BUTTON_GLUE[iid].gpio_flags,
+                              iid,
+                              &BUTTON_GLUE[iid]);
     }
+
+    return 0;
 }
 
-const anjay_dm_object_def_t **push_button_object_create(void) {
-    push_button_object_t *obj =
-            (push_button_object_t *) avs_calloc(1,
-                                                sizeof(push_button_object_t));
-    if (!obj) {
-        return NULL;
-    }
-    obj->def = OBJ_DEF_PTR;
-
-#    define CONFIGURE(idx)                                                  \
-        configure_push_button(                                              \
-                obj,                                                        \
-                DEVICE_DT_GET(DT_GPIO_CTLR(PUSH_BUTTON_NODE(idx), gpios)),  \
-                DT_GPIO_PIN(PUSH_BUTTON_NODE(idx), gpios),                  \
-                (GPIO_INPUT | DT_GPIO_FLAGS(PUSH_BUTTON_NODE(idx), gpios)), \
-                idx)
-
-#    if PUSH_BUTTON_AVAILABLE(0)
-    CONFIGURE(0);
-#    endif // PUSH_BUTTON_AVAILABLE(0)
-#    if PUSH_BUTTON_AVAILABLE(1)
-    CONFIGURE(1);
-#    endif // PUSH_BUTTON_AVAILABLE(1)
-#    if PUSH_BUTTON_AVAILABLE(2)
-    CONFIGURE(2);
-#    endif // PUSH_BUTTON_AVAILABLE(2)
-
-#    undef CONFIGURE
-
-    if (!obj->instances) {
-        const anjay_dm_object_def_t **out_def = &OBJ_DEF_PTR;
-        push_button_object_release(&out_def);
-        return NULL;
-    }
-
-    return &obj->def;
-}
-
-void push_button_object_update(anjay_t *anjay,
-                               const anjay_dm_object_def_t *const *def) {
-    if (!anjay || !def) {
-        return;
-    }
-
-    push_button_object_t *obj = get_obj(def);
-
-    AVS_LIST(push_button_instance_t) inst;
-    AVS_LIST_FOREACH(inst, obj->instances) {
-        if (inst->digital_input_counter_changed) {
-            inst->digital_input_counter_changed = false;
-            (void) anjay_notify_changed(anjay, obj->def->oid, inst->iid,
-                                        RID_DIGITAL_INPUT_COUNTER);
-        }
-
-        int button_state = gpio_pin_get(inst->dev, inst->gpio_pin);
-        if (button_state >= 0 && button_state != inst->digital_input_state) {
-            inst->digital_input_state = button_state;
-            (void) anjay_notify_changed(anjay, obj->def->oid, inst->iid,
-                                        RID_DIGITAL_INPUT_STATE);
-        }
-    }
-}
 #else  // PUSH_BUTTON_AVAILABLE_ANY
-const anjay_dm_object_def_t **push_button_object_create(void) {
-    return NULL;
+int push_button_object_install(anjay_t *anjay) {
+    return 0;
 }
 
-void push_button_object_release(const anjay_dm_object_def_t ***out_def) {
-    (void) out_def;
-}
-
-void push_button_object_update(anjay_t *anjay,
-                               const anjay_dm_object_def_t *const *def) {
-    (void) anjay;
-    (void) def;
-}
+void push_button_object_update(anjay_t *anjay) {}
 #endif // PUSH_BUTTON_AVAILABLE_ANY

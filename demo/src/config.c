@@ -46,6 +46,11 @@
 // storage is defined in devicetree
 FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
 
+typedef int config_option_validate_t(const struct shell *shell,
+                                     const char *value,
+                                     size_t value_len,
+                                     option_id_t option);
+
 typedef struct {
 #ifdef CONFIG_WIFI
     char ssid[32];
@@ -55,6 +60,10 @@ typedef struct {
     char ep_name[64];
     char psk[32];
     char bootstrap[2];
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+    char gps_nrf_prio_mode_timeout[AVS_UINT_STR_BUF_SIZE(uint32_t)];
+    char gps_nrf_prio_mode_cooldown[AVS_UINT_STR_BUF_SIZE(uint32_t)];
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 } app_config_t;
 
 static app_config_t APP_CONFIG;
@@ -63,22 +72,37 @@ typedef struct {
     const char *const desc;
     char *const value;
     size_t value_capacity;
-    bool flag;
+    config_option_validate_t *validator;
 } option_t;
+
+static config_option_validate_t string_validate;
+static config_option_validate_t flag_validate;
+static config_option_validate_t uint32_validate;
 
 static option_t STRING_OPTIONS[] = {
 #ifdef CONFIG_WIFI
-    [OPTION_SSID] = { "Wi-Fi SSID", APP_CONFIG.ssid, sizeof(APP_CONFIG.ssid) },
+    [OPTION_SSID] = { "Wi-Fi SSID", APP_CONFIG.ssid, sizeof(APP_CONFIG.ssid),
+                      string_validate },
     [OPTION_PASSWORD] = { "Wi-Fi password", APP_CONFIG.password,
-                          sizeof(APP_CONFIG.password) },
+                          sizeof(APP_CONFIG.password), string_validate },
 #endif // CONFIG_WIFI
-    [OPTION_URI] = { "LwM2M Server URI", APP_CONFIG.uri,
-                     sizeof(APP_CONFIG.uri) },
+    [OPTION_URI] = { "LwM2M Server URI", APP_CONFIG.uri, sizeof(APP_CONFIG.uri),
+                     string_validate },
     [OPTION_EP_NAME] = { "Endpoint name", APP_CONFIG.ep_name,
-                         sizeof(APP_CONFIG.ep_name) },
-    [OPTION_PSK] = { "PSK", APP_CONFIG.psk, sizeof(APP_CONFIG.psk) },
+                         sizeof(APP_CONFIG.ep_name), string_validate },
+    [OPTION_PSK] = { "PSK", APP_CONFIG.psk, sizeof(APP_CONFIG.psk),
+                     string_validate },
     [OPTION_BOOTSTRAP] = { "Bootstrap", APP_CONFIG.bootstrap,
-                           sizeof(APP_CONFIG.bootstrap), true }
+                           sizeof(APP_CONFIG.bootstrap), flag_validate },
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+    [OPTION_GPS_NRF_PRIO_MODE_TIMEOUT] =
+            { "GPS priority mode timeout", APP_CONFIG.gps_nrf_prio_mode_timeout,
+              sizeof(APP_CONFIG.gps_nrf_prio_mode_timeout), uint32_validate },
+    [OPTION_GPS_NRF_PRIO_MODE_COOLDOWN] =
+            { "GPS priority mode cooldown",
+              APP_CONFIG.gps_nrf_prio_mode_cooldown,
+              sizeof(APP_CONFIG.gps_nrf_prio_mode_cooldown), uint32_validate },
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 };
 
 void config_print_summary(const struct shell *shell) {
@@ -250,7 +274,11 @@ void config_default_init(void) {
 #endif // CONFIG_WIFI
         .uri = SERVER_URI,
         .psk = PSK_KEY,
-        .bootstrap = BOOTSTRAP
+        .bootstrap = BOOTSTRAP,
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+        .gps_nrf_prio_mode_timeout = GPS_NRF_PRIO_MODE_TIMEOUT,
+        .gps_nrf_prio_mode_cooldown = GPS_NRF_PRIO_MODE_COOLDOWN,
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
     };
 
     device_id_t id;
@@ -308,21 +336,18 @@ int config_set_option(const struct shell *shell,
     const char *value = argv[1];
     size_t value_len = strlen(value) + 1;
 
-    if (STRING_OPTIONS[option].flag) {
-        if (value_len != STRING_OPTIONS[option].value_capacity
-                || (value[0] != 'y' && value[0] != 'n')) {
-            shell_print(shell, "Value invalid, 'y' or 'n' is allowed\n");
-            return -1;
-        }
-    } else if (value_len > STRING_OPTIONS[option].value_capacity) {
-        shell_print(shell, "Value too long, maximum length is %d\n",
-                    STRING_OPTIONS[option].value_capacity - 1);
+    assert(STRING_OPTIONS[option].validator);
+    if (STRING_OPTIONS[option].validator(shell, value, value_len, option)) {
         return -1;
     }
 
     memcpy(STRING_OPTIONS[option].value, value, value_len);
 
     return 0;
+}
+
+static int parse_uint32(const char *value, uint32_t *out) {
+    return sscanf(value, "%" PRIu32, out) == 1 ? 0 : -1;
 }
 
 const char *config_get_endpoint_name(void) {
@@ -349,4 +374,60 @@ const char *config_get_psk(void) {
 
 bool config_is_bootstrap(void) {
     return APP_CONFIG.bootstrap[0] == 'y';
+}
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+uint32_t config_get_gps_nrf_prio_mode_timeout(void) {
+    uint32_t out;
+    parse_uint32(APP_CONFIG.gps_nrf_prio_mode_timeout, &out);
+    return out;
+}
+
+uint32_t config_get_gps_nrf_prio_mode_cooldown(void) {
+    uint32_t out;
+    parse_uint32(APP_CONFIG.gps_nrf_prio_mode_cooldown, &out);
+    return out;
+}
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+
+static int string_validate(const struct shell *shell,
+                           const char *value,
+                           size_t value_len,
+                           option_id_t option) {
+    if (value_len > STRING_OPTIONS[option].value_capacity) {
+        shell_error(shell, "Value too long, maximum length is %d\n",
+                    STRING_OPTIONS[option].value_capacity - 1);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int flag_validate(const struct shell *shell,
+                         const char *value,
+                         size_t value_len,
+                         option_id_t option) {
+    if (value_len != 2 || (value[0] != 'y' && value[0] != 'n')) {
+        shell_error(shell, "Value invalid, 'y' or 'n' is allowed\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+static int uint32_validate(const struct shell *shell,
+                           const char *value,
+                           size_t value_len,
+                           option_id_t option) {
+    if (string_validate(shell, value, value_len, option)) {
+        return -1;
+    }
+
+    uint32_t out;
+    if (parse_uint32(value, &out)) {
+        shell_error(shell, "Argument is not a valid uint32_t value");
+        return -1;
+    }
+
+    return 0;
 }

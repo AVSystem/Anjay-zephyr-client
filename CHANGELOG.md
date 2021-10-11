@@ -1,5 +1,25 @@
 # Changelog
 
+## 21.10 (Oct 11th, 2021)
+
+- Updated Anjay-zephyr to 2.14.0
+
+### Added
+
+- Edge Impulse example
+- L475 support in minimal client
+- nRF9160 DK support in minimal client
+- Thingy:91 support in minimal client
+
+### Improvements
+
+- Cleaner code using Anjay event loop
+- Simpler demo implementation using Anjay IPSO objects
+
+### Fixes
+
+- Fixed global names
+
 ## 21.07 (Jul 30th, 2021)
 
 - Updated Anjay-zephyr to 2.13.0

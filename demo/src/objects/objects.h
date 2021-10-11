@@ -27,52 +27,30 @@ void location_object_update(anjay_t *anjay,
 
 #define TEMPERATURE_NODE DT_ALIAS(temperature)
 #define TEMPERATURE_AVAILABLE DT_NODE_HAS_STATUS(TEMPERATURE_NODE, okay)
-const anjay_dm_object_def_t **temperature_object_create(void);
-void temperature_object_release(const anjay_dm_object_def_t ***out_def);
-void temperature_object_update(anjay_t *anjay,
-                               const anjay_dm_object_def_t *const *def);
 
 #define HUMIDITY_NODE DT_ALIAS(humidity)
 #define HUMIDITY_AVAILABLE DT_NODE_HAS_STATUS(HUMIDITY_NODE, okay)
-const anjay_dm_object_def_t **humidity_object_create(void);
-void humidity_object_release(const anjay_dm_object_def_t ***out_def);
-void humidity_object_update(anjay_t *anjay,
-                            const anjay_dm_object_def_t *const *def);
-
-#define DISTANCE_NODE DT_ALIAS(distance)
-#define DISTANCE_AVAILABLE DT_NODE_HAS_STATUS(DISTANCE_AVAILABLE, okay)
-const anjay_dm_object_def_t **distance_object_create(void);
-void distance_object_release(const anjay_dm_object_def_t ***out_def);
-void distance_object_update(anjay_t *anjay,
-                            const anjay_dm_object_def_t *const *def);
 
 #define BAROMETER_NODE DT_ALIAS(barometer)
 #define BAROMETER_AVAILABLE DT_NODE_HAS_STATUS(BAROMETER_NODE, okay)
-const anjay_dm_object_def_t **barometer_object_create(void);
-void barometer_object_release(const anjay_dm_object_def_t ***out_def);
-void barometer_object_update(anjay_t *anjay,
-                             const anjay_dm_object_def_t *const *def);
+
+#define DISTANCE_NODE DT_ALIAS(distance)
+#define DISTANCE_AVAILABLE DT_NODE_HAS_STATUS(DISTANCE_NODE, okay)
+
+void basic_sensors_install(anjay_t *anjay);
+void basic_sensors_update(anjay_t *anjay);
 
 #define ACCELEROMETER_NODE DT_ALIAS(accelerometer)
 #define ACCELEROMETER_AVAILABLE DT_NODE_HAS_STATUS(ACCELEROMETER_NODE, okay)
-const anjay_dm_object_def_t **accelerometer_object_create(void);
-void accelerometer_object_release(const anjay_dm_object_def_t ***out_def);
-void accelerometer_object_update(anjay_t *anjay,
-                                 const anjay_dm_object_def_t *const *def);
 
 #define GYROMETER_NODE DT_ALIAS(gyrometer)
 #define GYROMETER_AVAILABLE DT_NODE_HAS_STATUS(GYROMETER_NODE, okay)
-const anjay_dm_object_def_t **gyrometer_object_create(void);
-void gyrometer_object_release(const anjay_dm_object_def_t ***out_def);
-void gyrometer_object_update(anjay_t *anjay,
-                             const anjay_dm_object_def_t *const *def);
 
 #define MAGNETOMETER_NODE DT_ALIAS(magnetometer)
 #define MAGNETOMETER_AVAILABLE DT_NODE_HAS_STATUS(MAGNETOMETER_NODE, okay)
-const anjay_dm_object_def_t **magnetometer_object_create(void);
-void magnetometer_object_release(const anjay_dm_object_def_t ***out_def);
-void magnetometer_object_update(anjay_t *anjay,
-                                const anjay_dm_object_def_t *const *def);
+
+void three_axis_sensors_install(anjay_t *anjay);
+void three_axis_sensors_update(anjay_t *anjay);
 
 #define PUSH_BUTTON_NODE(idx) DT_ALIAS(push_button_##idx)
 #define PUSH_BUTTON_AVAILABLE(idx) \
@@ -80,10 +58,7 @@ void magnetometer_object_update(anjay_t *anjay,
 #define PUSH_BUTTON_AVAILABLE_ANY                         \
     (PUSH_BUTTON_AVAILABLE(0) || PUSH_BUTTON_AVAILABLE(1) \
      || PUSH_BUTTON_AVAILABLE(2))
-const anjay_dm_object_def_t **push_button_object_create(void);
-void push_button_object_release(const anjay_dm_object_def_t ***out_def);
-void push_button_object_update(anjay_t *anjay,
-                               const anjay_dm_object_def_t *const *def);
+int push_button_object_install(anjay_t *anjay);
 
 #define SWITCH_NODE(idx) DT_ALIAS(switch_##idx)
 #define SWITCH_AVAILABLE(idx) DT_NODE_HAS_STATUS(SWITCH_NODE(idx), okay)

@@ -23,7 +23,6 @@
 #include <drivers/entropy.h>
 #include <net/dns_resolve.h>
 #include <net/sntp.h>
-#include <posix/time.h>
 
 #include <anjay/anjay.h>
 #include <anjay/attr_storage.h>
@@ -38,73 +37,36 @@
 #include <avsystem/commons/avs_prng.h>
 LOG_MODULE_REGISTER(anjay);
 
-#include "common.h"
-
 #include "objects/objects.h"
 #include <random/rand32.h>
 
+#ifdef CONFIG_WIFI
+#    ifdef CONFIG_WIFI_ESWIFI
+#        include <wifi/eswifi/eswifi.h>
+#    endif // CONFIG_WIFI_ESWIFI
+#    include <net/wifi.h>
+#    include <net/wifi_mgmt.h>
+#endif // CONFIG_WIFI
+
+#ifdef CONFIG_LTE_LINK_CONTROL
+#    include <modem/lte_lc.h>
+#endif // CONFIG_LTE_LINK_CONTROL
+
+#ifdef CONFIG_POSIX_API
+#    include <posix/time.h>
+#endif // CONFIG_POSIX_API
+
+#ifdef CONFIG_DATE_TIME
+#    include <date_time.h>
+#endif // CONFIG_DATE_TIME
+
 static const anjay_dm_object_def_t **DEVICE_OBJ;
 
-static anjay_t *ANJAY;
-K_MUTEX_DEFINE(ANJAY_MTX);
-volatile bool ANJAY_RUNNING = false;
+#define ANJAY_THREAD_PRIO 1
+#define ANJAY_THREAD_STACK_SIZE 8192
 
-// main thread priority is 0 and 1 is the lower priority
-#define UPDATE_OBJECTS_THREAD_PRIO 2
-#define UPDATE_OBJECTS_THREAD_STACK_SIZE 2048
-
-static struct k_thread UPDATE_OBJECTS_THREAD;
-K_THREAD_STACK_DEFINE(UPDATE_OBJECTS_STACK, UPDATE_OBJECTS_THREAD_STACK_SIZE);
-
-struct k_thread ANJAY_THREAD;
+static struct k_thread ANJAY_THREAD;
 K_THREAD_STACK_DEFINE(ANJAY_STACK, ANJAY_THREAD_STACK_SIZE);
-
-void main_loop(void) {
-    while (ANJAY_RUNNING) {
-        SYNCHRONIZED(ANJAY_MTX) {
-            // Obtain all network data sources
-            AVS_LIST(avs_net_socket_t *const) sockets = NULL;
-            sockets = anjay_get_sockets(ANJAY);
-
-            // Prepare to poll() on them
-            size_t numsocks = AVS_LIST_SIZE(sockets);
-            struct pollfd pollfds[numsocks];
-            size_t i = 0;
-            AVS_LIST(avs_net_socket_t *const) sock;
-            AVS_LIST_FOREACH(sock, sockets) {
-                pollfds[i].fd = *(const int *) avs_net_socket_get_system(*sock);
-                pollfds[i].events = POLLIN;
-                pollfds[i].revents = 0;
-                ++i;
-            }
-
-            const int max_wait_time_ms = 1000;
-            // Determine the expected time to the next job in milliseconds.
-            // If there is no job we will wait till something arrives for
-            // at most 1 second (i.e. max_wait_time_ms).
-            int wait_ms = max_wait_time_ms;
-            wait_ms =
-                    anjay_sched_calculate_wait_time_ms(ANJAY, max_wait_time_ms);
-
-            // Wait for the events if necessary, and handle them.
-            if (poll(pollfds, numsocks, wait_ms) > 0) {
-                int socket_id = 0;
-                AVS_LIST(avs_net_socket_t *const) socket = NULL;
-                AVS_LIST_FOREACH(socket, sockets) {
-                    if (pollfds[socket_id].revents) {
-                        if (anjay_serve(ANJAY, *socket)) {
-                            avs_log(zephyr_demo, ERROR, "anjay_serve failed");
-                        }
-                    }
-                    ++socket_id;
-                }
-            }
-
-            // Finally run the scheduler
-            anjay_sched_run(ANJAY);
-        }
-    }
-}
 
 static void
 log_handler(avs_log_level_t level, const char *module, const char *message) {
@@ -137,6 +99,7 @@ int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
 }
 
 static void set_system_time(const struct sntp_time *time) {
+#ifdef CONFIG_POSIX_API
     struct timespec ts = {
         .tv_sec = time->seconds,
         .tv_nsec = ((uint64_t) time->fraction * 1000000000) >> 32
@@ -144,6 +107,13 @@ static void set_system_time(const struct sntp_time *time) {
     if (clock_settime(CLOCK_REALTIME, &ts)) {
         avs_log(zephyr_demo, WARNING, "Failed to set time");
     }
+#endif // CONFIG_POSIX_API
+
+#ifdef CONFIG_DATE_TIME
+    const struct tm *current_time = gmtime(&time->seconds);
+    date_time_set(current_time);
+    date_time_update_async(NULL);
+#endif // CONFIG_DATE_TIME
 }
 
 void synchronize_clock(void) {
@@ -156,9 +126,9 @@ void synchronize_clock(void) {
     }
 }
 
-static int register_objects(void) {
+static int register_objects(anjay_t *anjay) {
     if (!(DEVICE_OBJ = device_object_create())
-            || anjay_register_object(ANJAY, DEVICE_OBJ)) {
+            || anjay_register_object(anjay, DEVICE_OBJ)) {
         return -1;
     }
     /**
@@ -168,29 +138,16 @@ static int register_objects(void) {
     return 0;
 }
 
-static void update_objects_frequent(void) {
-    device_object_update(ANJAY, DEVICE_OBJ);
+static void update_objects(avs_sched_t *sched, const void *anjay_ptr) {
+    anjay_t *anjay = *(anjay_t *const *) anjay_ptr;
+
+    device_object_update(anjay, DEVICE_OBJ);
     /**
      * Add additional object updates here
      */
-}
 
-void update_objects(void *arg1, void *arg2, void *arg3) {
-    (void) arg1;
-    (void) arg2;
-    (void) arg3;
-
-    assert(ANJAY);
-
-    size_t cycle = 0;
-    while (ANJAY_RUNNING) {
-        SYNCHRONIZED(ANJAY_MTX) {
-            update_objects_frequent();
-        }
-
-        cycle++;
-        k_sleep(K_SECONDS(1));
-    }
+    AVS_SCHED_DELAYED(sched, NULL, avs_time_duration_from_scalar(1, AVS_TIME_S),
+                      update_objects, &anjay, sizeof(anjay));
 }
 
 static void release_objects(void) {
@@ -202,9 +159,44 @@ static void release_objects(void) {
 
 void initialize_network(void) {
     avs_log(zephyr_demo, INFO, "Initializing network connection...");
-    /**
-     * Initialize WIFI, cellular or some other internet connection here
-     */
+#ifdef CONFIG_WIFI
+    struct net_if *iface = net_if_get_default();
+
+#    ifdef CONFIG_WIFI_ESWIFI
+    struct eswifi_dev *eswifi = eswifi_by_iface_idx(0);
+    assert(eswifi);
+    // Set regulatory domain to "World Wide (passive Ch12-14)"; eS-WiFi defaults
+    // to "US" which prevents connecting to networks that use channels 12-14.
+    if (eswifi_at_cmd(eswifi, "CN=XV\r") < 0) {
+        avs_log(zephyr_demo, WARNING, "Failed to set Wi-Fi regulatory domain");
+    }
+#    endif // CONFIG_WIFI_ESWIFI
+
+    struct wifi_connect_req_params wifi_params = {
+        .ssid = (uint8_t *) CONFIG_ANJAY_CLIENT_WIFI_SSID,
+        .ssid_length = strlen(CONFIG_ANJAY_CLIENT_WIFI_SSID),
+        .psk = (uint8_t *) CONFIG_ANJAY_CLIENT_WIFI_PASSWORD,
+        .psk_length = strlen(CONFIG_ANJAY_CLIENT_WIFI_PASSWORD),
+        .security = WIFI_SECURITY_TYPE_PSK
+    };
+
+    if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
+                 sizeof(struct wifi_connect_req_params))) {
+        avs_log(zephyr_demo, ERROR, "Failed to configure Wi-Fi");
+        exit(1);
+    }
+
+    net_mgmt_event_wait_on_iface(iface, NET_EVENT_IPV4_ADDR_ADD, NULL, NULL,
+                                 NULL, K_FOREVER);
+#endif // CONFIG_WIFI
+
+#ifdef CONFIG_LTE_LINK_CONTROL
+    int ret = lte_lc_init_and_connect();
+    if (ret < 0) {
+        avs_log(zephyr_demo, ERROR, "LTE link could not be established.");
+        exit(1);
+    }
+#endif // CONFIG_LTE_LINK_CONTROL
     avs_log(zephyr_demo, INFO, "Connected to network");
 }
 
@@ -222,21 +214,21 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
         .prng_ctx = PRNG_CTX
     };
 
-    ANJAY = anjay_new(&config);
-    if (!ANJAY) {
+    anjay_t *anjay = anjay_new(&config);
+    if (!anjay) {
         avs_log(zephyr_demo, ERROR, "Could not create Anjay object");
         exit(1);
     }
 
     // Install attr_storage and necessary objects
-    if (anjay_attr_storage_install(ANJAY)
-            || anjay_security_object_install(ANJAY)
-            || anjay_server_object_install(ANJAY)) {
+    if (anjay_attr_storage_install(anjay)
+            || anjay_security_object_install(anjay)
+            || anjay_server_object_install(anjay)) {
         avs_log(zephyr_demo, ERROR, "Failed to install necessary modules");
         goto cleanup;
     }
 
-    if (register_objects()) {
+    if (register_objects(anjay)) {
         avs_log(zephyr_demo, ERROR, "Failed to initialize objects");
         goto cleanup;
     }
@@ -264,7 +256,7 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
     };
 
     anjay_iid_t security_instance_id = ANJAY_ID_INVALID;
-    if (anjay_security_object_add_instance(ANJAY, &security_instance,
+    if (anjay_security_object_add_instance(anjay, &security_instance,
                                            &security_instance_id)) {
         avs_log(zephyr_demo, ERROR, "Failed to instantiate Security object");
         goto cleanup;
@@ -272,29 +264,26 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
 
     if (!false) {
         anjay_iid_t server_instance_id = ANJAY_ID_INVALID;
-        if (anjay_server_object_add_instance(ANJAY, &server_instance,
+        if (anjay_server_object_add_instance(anjay, &server_instance,
                                              &server_instance_id)) {
             avs_log(zephyr_demo, ERROR, "Failed to instantiate Server object");
             goto cleanup;
         }
     }
 
-    k_thread_create(&UPDATE_OBJECTS_THREAD, UPDATE_OBJECTS_STACK,
-                    UPDATE_OBJECTS_THREAD_STACK_SIZE, update_objects, NULL,
-                    NULL, NULL, UPDATE_OBJECTS_THREAD_PRIO, 0, K_NO_WAIT);
-
     avs_log(zephyr_demo, INFO, "Successfully created thread");
 
-    main_loop();
+    update_objects(anjay_get_scheduler(anjay), &anjay);
+    anjay_event_loop_run(anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
 
 cleanup:
-    anjay_delete(ANJAY);
+    anjay_delete(anjay);
     release_objects();
 }
 
 void main(void) {
     avs_log_set_handler(log_handler);
-    avs_log_set_default_level(DEFAULT_LOG_LEVEL);
+    avs_log_set_default_level(AVS_LOG_INFO);
 
     initialize_network();
 
@@ -308,17 +297,9 @@ void main(void) {
         exit(1);
     }
 
-    ANJAY_RUNNING = true;
-
-    while (true) {
-        if (ANJAY_RUNNING) {
-            k_thread_create(&ANJAY_THREAD, ANJAY_STACK, ANJAY_THREAD_STACK_SIZE,
-                            run_anjay, NULL, NULL, NULL, ANJAY_THREAD_PRIO, 0,
-                            K_NO_WAIT);
-            k_thread_join(&ANJAY_THREAD, K_FOREVER);
-            avs_log(zephyr_demo, INFO, "Anjay stopped");
-        } else {
-            k_sleep(K_SECONDS(1));
-        }
-    }
+    k_thread_create(&ANJAY_THREAD, ANJAY_STACK, ANJAY_THREAD_STACK_SIZE,
+                    run_anjay, NULL, NULL, NULL, ANJAY_THREAD_PRIO, 0,
+                    K_NO_WAIT);
+    k_thread_join(&ANJAY_THREAD, K_FOREVER);
+    avs_log(zephyr_demo, INFO, "Anjay stopped");
 }

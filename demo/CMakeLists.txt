@@ -34,21 +34,12 @@ set(app_common_sources
     src/objects/location.c
     src/objects/push_button.c
     src/objects/switch.c
-    src/objects/temperature.c
-    src/objects/humidity.c
-    src/objects/distance.c
-    src/objects/barometer.c
-    src/objects/accelerometer.c
-    src/objects/gyrometer.c
-    src/objects/magnetometer.c
+    src/objects/basic_sensors.c
+    src/objects/three_axis_sensors.c
     src/objects/buzzer.c
-    src/objects/led_color_light.c
-    src/objects/impl/basic_sensor_impl.c
-    src/objects/impl/basic_sensor_impl.h
-    src/objects/impl/three_axis_sensor_impl.c
-    src/objects/impl/three_axis_sensor_impl.h)
+    src/objects/led_color_light.c)
 
-if((${BOARD} MATCHES "^nrf9160dk_nrf9160ns") OR (${BOARD} MATCHES "^thingy91_nrf9160ns"))
+if(CONFIG_ANJAY_CLIENT_GPS_NRF)
     target_sources(app PRIVATE
                    ${app_common_sources}
                    src/gps_impl/gps_nrf.c)

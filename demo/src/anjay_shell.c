@@ -22,13 +22,11 @@ cmd_anjay_start(const struct shell *shell, size_t argc, char **argv) {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    if (!ANJAY_RUNNING) {
+    if (!atomic_load(&ANJAY_RUNNING)) {
         shell_print(shell, "Saving config");
         config_save(shell_backend_uart_get_ptr());
         shell_print(shell, "Starting Anjay");
-        SYNCHRONIZED(ANJAY_MTX) {
-            ANJAY_RUNNING = true;
-        }
+        atomic_store(&ANJAY_RUNNING, true);
     } else {
         shell_warn(shell, "Cannot start Anjay - already running");
     }
@@ -40,10 +38,9 @@ static int cmd_anjay_stop(const struct shell *shell, size_t argc, char **argv) {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    if (ANJAY_RUNNING) {
-        SYNCHRONIZED(ANJAY_MTX) {
-            ANJAY_RUNNING = false;
-        }
+    if (atomic_load(&ANJAY_RUNNING)) {
+        anjay_event_loop_interrupt(ANJAY);
+        atomic_store(&ANJAY_RUNNING, false);
         k_thread_join(&ANJAY_THREAD, K_FOREVER);
     } else {
         shell_warn(shell, "Anjay is not running");
@@ -56,7 +53,7 @@ static int common_cmd_setter(const struct shell *shell,
                              size_t argc,
                              char **argv,
                              option_id_t option) {
-    if (ANJAY_RUNNING) {
+    if (atomic_load(&ANJAY_RUNNING)) {
         shell_print(shell, "Cannot change the config while Anjay is running");
         return -1;
     } else {
@@ -71,15 +68,15 @@ static int cmd_anjay_config_set_endpoint(const struct shell *shell,
 }
 
 #ifdef CONFIG_WIFI
-int cmd_anjay_config_set_wifi_ssid(const struct shell *shell,
-                                   size_t argc,
-                                   char **argv) {
+static int cmd_anjay_config_set_wifi_ssid(const struct shell *shell,
+                                          size_t argc,
+                                          char **argv) {
     return common_cmd_setter(shell, argc, argv, OPTION_SSID);
 }
 
-int cmd_anjay_config_set_wifi_password(const struct shell *shell,
-                                       size_t argc,
-                                       char **argv) {
+static int cmd_anjay_config_set_wifi_password(const struct shell *shell,
+                                              size_t argc,
+                                              char **argv) {
     return common_cmd_setter(shell, argc, argv, OPTION_PASSWORD);
 }
 #endif // CONFIG_WIFI
@@ -100,12 +97,26 @@ static int cmd_anjay_config_set_bootstrap(const struct shell *shell,
     return common_cmd_setter(shell, argc, argv, OPTION_BOOTSTRAP);
 }
 
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+static int cmd_anjay_config_set_gps_nrf_prio_mode_timeout(
+        const struct shell *shell, size_t argc, char **argv) {
+    return common_cmd_setter(
+            shell, argc, argv, OPTION_GPS_NRF_PRIO_MODE_TIMEOUT);
+}
+
+static int cmd_anjay_config_set_gps_nrf_prio_mode_cooldown(
+        const struct shell *shell, size_t argc, char **argv) {
+    return common_cmd_setter(
+            shell, argc, argv, OPTION_GPS_NRF_PRIO_MODE_COOLDOWN);
+}
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+
 static int
 cmd_anjay_config_default(const struct shell *shell, size_t argc, char **argv) {
     ARG_UNUSED(argc);
     ARG_UNUSED(argv);
 
-    if (ANJAY_RUNNING) {
+    if (atomic_load(&ANJAY_RUNNING)) {
         shell_print(shell, "Cannot change the config while Anjay is running");
         return -1;
     } else {
@@ -155,8 +166,22 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
                   NULL,
                   "Perform bootstrap",
                   cmd_anjay_config_set_bootstrap),
-        SHELL_SUBCMD_SET_END // Array terminated
-);
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+        SHELL_CMD(gps_prio_mode_timeout,
+                  NULL,
+                  "GPS priority mode timeout - determines (in seconds) for how "
+                  "long the modem can run with LTE disabled, in case of "
+                  "trouble with producing a GPS fix. Set to 0 to disable GPS "
+                  "priority mode at all.",
+                  cmd_anjay_config_set_gps_nrf_prio_mode_timeout),
+        SHELL_CMD(gps_prio_mode_cooldown,
+                  NULL,
+                  "GPS priority mode cooldown - determines (in seconds) how "
+                  "much time must pass after a failed try to produce a GPS fix "
+                  "to enable GPS priority mode again.",
+                  cmd_anjay_config_set_gps_nrf_prio_mode_cooldown),
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+        SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
         sub_anjay_config,
@@ -167,15 +192,13 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
         SHELL_CMD(save, NULL, "Save Anjay config", cmd_anjay_config_save),
         SHELL_CMD(set, &sub_anjay_config_set, "Change Anjay config", NULL),
         SHELL_CMD(show, NULL, "Show Anjay config", cmd_anjay_config_show),
-        SHELL_SUBCMD_SET_END // Array terminated
-);
+        SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
         sub_anjay,
         SHELL_CMD(start, NULL, "Save config and start Anjay", cmd_anjay_start),
         SHELL_CMD(stop, NULL, "Stop Anjay", cmd_anjay_stop),
         SHELL_CMD(config, &sub_anjay_config, "Configure Anjay params", NULL),
-        SHELL_SUBCMD_SET_END // Array terminated
-);
+        SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(anjay, &sub_anjay, "Anjay commands", NULL);
