@@ -28,7 +28,7 @@ manifest:
     - name: Anjay-zephyr
       submodules: true
       remote: anjay
-      revision: 19bab78cc7a7df8ce9362ef8134d31c4a4e95149
+      revision: 2.14.0
       path: modules/lib/anjay
   self:
     path: Anjay-zephyr-client

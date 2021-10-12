@@ -19,7 +19,7 @@
 #include <autoconf.h>
 #include <avsystem/commons/avs_log.h>
 
-#define CLIENT_VERSION "21.10"
+#define CLIENT_VERSION "21.10.1"
 
 #define DEFAULT_LOG_LEVEL AVS_LOG_INFO
 

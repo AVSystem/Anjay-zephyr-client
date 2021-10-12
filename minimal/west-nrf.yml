@@ -16,7 +16,7 @@
 manifest:
   remotes:
     - name: anjay
-      url-base: https://gitlab.avsystem.com/internal/embedded/
+      url-base: https://github.com/AVSystem
     - name: ncs
       url-base: https://github.com/nrfconnect
   projects:
@@ -25,10 +25,10 @@ manifest:
       remote: ncs
       revision: v1.6.0
       import: true
-    - name: anjay-zephyr
+    - name: Anjay-zephyr
       submodules: true
       remote: anjay
-      revision: ba80de2396a8840c787416c32b98142c07dc8d23
-      path: modules/lib/anjay-internal
+      revision: 2.14.0
+      path: modules/lib/anjay
   self:
     path: Anjay-zephyr-client
