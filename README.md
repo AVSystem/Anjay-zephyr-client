@@ -38,7 +38,7 @@ LwM2M Server, please register at https://www.avsystem.com/try-anjay/. Then have
 a look at the example configuration to configure security credentials and other
 necessary settings (like Wi-Fi SSID etc.).
 
-[Video guide showing basic usage of Try-Anjay](https://www.youtube.com/watchv=fgy38XfttM8)
+[Video guide showing basic usage of Try-Anjay](https://www.youtube.com/watch?v=fgy38XfttM8)
 is available on YouTube.
 
 NOTE: You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI
