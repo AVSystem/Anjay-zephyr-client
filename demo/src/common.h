@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,12 +26,17 @@
 
 #include <anjay/anjay.h>
 
+extern volatile atomic_bool DEVICE_INITIALIZED;
+
 extern anjay_t *volatile ANJAY;
+extern struct k_mutex ANJAY_MUTEX;
 extern volatile atomic_bool ANJAY_RUNNING;
 
 #define ANJAY_THREAD_PRIO 1
 #define ANJAY_THREAD_STACK_SIZE 4096
-
 extern struct k_thread ANJAY_THREAD;
+extern volatile bool ANJAY_THREAD_RUNNING;
+extern struct k_mutex ANJAY_THREAD_RUNNING_MUTEX;
+extern struct k_condvar ANJAY_THREAD_RUNNING_CONDVAR;
 
 #endif // ANJAY_ZEPHYR_COMMON

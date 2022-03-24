@@ -7,8 +7,8 @@ It should serve as a template for custom projects.
 This folder contains LwM2M Client minimal application example for following targets:
  - [qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)
  - [disco_l475_iot1](https://docs.zephyrproject.org/latest/boards/arm/disco_l475_iot1/doc/index.html)
- - [nrf9160dk_nrf9160ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
- - [thingy91_nrf9160ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
+ - [nrf9160dk_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
+ - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
 
 The following LwM2M Objects are supported:
  - Security (/0)
@@ -35,7 +35,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160ns` or `west build -b thingy91_nrf9160ns` in `minimal` directory, respectively.
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `west build -b thingy91_nrf9160_ns` in `minimal` directory, respectively.
 
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.
@@ -47,12 +47,18 @@ Now you can compile the project using `west build -b nrf9160dk_nrf9160ns` or `we
 
 ## Flashing the target
 
-After successful build you can flash the target using `west flash`.
+After successful build you can flash the target using:
 
-> **__NOTE (Thingy:91):__**
-> Thingy:91 doesn't have an onboard debug probe (and MCUBoot is not supported), so you must use an external J-link programmer with support for Arm Cortex-M33 devices.
-> 
-> Make sure that SWD SELECT (SW2) switch is set to NRF91, connect the Thingy:91 to a programmer and run `west flash`.
+```shell
+west flash
+```
+
+For the Thingy:91 target, if you don't have an external programmer board, you can also enter the MCUboot recovery mode by turning the Thingy:91 on while holding the main button (SW3), and use [mcumgr](https://github.com/apache/mynewt-mcumgr-cli):
+
+```shell
+mcumgr --conntype serial --connstring dev=/dev/ttyACM0 image upload build/zephyr/app_update.bin
+mcumgr --conntype serial --connstring dev=/dev/ttyACM0 reset
+```
 
 ## qemu_x86 networking setup
 

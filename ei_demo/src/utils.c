@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 #include <avsystem/commons/avs_utils.h>
 
 int get_device_id(device_id_t *out_id) {
-    memset(out_id->value, sizeof(out_id->value), 0);
+    memset(out_id->value, 0, sizeof(out_id->value));
 
     uint8_t id[12];
     ssize_t retval = hwinfo_get_device_id(id, sizeof(id));

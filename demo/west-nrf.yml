@@ -1,4 +1,4 @@
-# Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,20 +15,18 @@
 # Manifest for sdk-nrf based samples
 manifest:
   remotes:
-    - name: anjay
-      url-base: https://github.com/AVSystem
-    - name: ncs
-      url-base: https://github.com/nrfconnect
+  - name: anjay
+    url-base: https://github.com/AVSystem
+  - name: ncs
+    url-base: https://github.com/nrfconnect
   projects:
-    - name: sdk-nrf
-      path: nrf
-      remote: ncs
-      revision: v1.6.0
-      import: true
-    - name: Anjay-zephyr
-      submodules: true
-      remote: anjay
-      revision: 2.14.0
-      path: modules/lib/anjay
-  self:
-    path: Anjay-zephyr-client
+  - name: sdk-nrf
+    path: nrf
+    remote: ncs
+    revision: v1.9.1
+    import: true
+  - name: Anjay-zephyr
+    submodules: true
+    remote: anjay
+    revision: c21c5ab05eaa61e1fb4ace28ef03fe239eaf48f2
+    path: modules/lib/anjay

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,9 +103,9 @@ static void button_state_changed(const struct device *dev,
 
             if (k_work_submit(&work->work) == 1) {
                 return;
-            } else {
-                break;
             }
+
+            break;
         }
     }
 

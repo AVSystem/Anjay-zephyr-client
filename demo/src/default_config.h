@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 #include <autoconf.h>
 #include <avsystem/commons/avs_log.h>
 
-#define CLIENT_VERSION "21.10.1"
+#define CLIENT_VERSION "22.03"
 
 #define DEFAULT_LOG_LEVEL AVS_LOG_INFO
 

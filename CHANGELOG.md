@@ -1,5 +1,27 @@
 # Changelog
 
+## 22.03 (Mar 24th, 2022)
+
+- Updated Anjay-zephyr to 2.14.1
+- Updated Zephyr to 2.7.0
+- Updated sdk-nrf to 1.9.1
+- Updated ei_demo to use the Edge Impulse wrapper from sdk-nrf
+
+### Added
+
+- Added support for firmware update
+
+### Improvements
+
+- Made GPS support configurable through Kconfig
+- Migrated nRF targets to use nrfxlib sockets
+- Migrated configuration to use Zephyr settings API
+
+### Fixes
+
+- Made the code more thread-safe
+- Fixed erroneous uses of memset()
+
 ## 21.10 (Oct 11th, 2021)
 
 - Updated Anjay-zephyr to 2.14.0

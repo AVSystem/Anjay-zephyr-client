@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,9 +36,9 @@
 #include <logging/log.h>
 #include <zephyr.h>
 
-#include "../inference.h"
 #include "../led.h"
 #include "objects.h"
+#include <ei_wrapper.h>
 
 LOG_MODULE_REGISTER(pattern_detector);
 
@@ -94,9 +94,7 @@ typedef struct pattern_detector_object_struct {
 
     struct k_work_delayable measure_accel_dwork;
     struct k_work_sync sync;
-    size_t next_sample_no;
     int64_t last_run_timestamp;
-    float inference_data[];
 } pattern_detector_object_t;
 
 static const pattern_detector_instance_state_t INITIAL_STATE = {
@@ -108,9 +106,13 @@ static const pattern_detector_instance_state_t INITIAL_STATE = {
     for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); \
          !_synchronized_exit; _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))
 
+static pattern_detector_object_t *INSTALLED_OBJ;
+static bool wrapper_initialized = false;
+
 static void schedule_next_measure(pattern_detector_object_t *obj) {
     const int64_t next_run_timestamp =
-            obj->last_run_timestamp + ML_SAMPLING_INTERVAL_MS;
+            obj->last_run_timestamp
+            + 1000 / ei_wrapper_get_classifier_frequency();
     const int64_t curr_time = k_uptime_get();
     k_timeout_t next_run_delay;
 
@@ -129,11 +131,59 @@ static void schedule_next_measure(pattern_detector_object_t *obj) {
 
 static pattern_detector_instance_t *
 find_instance(const pattern_detector_object_t *obj, anjay_iid_t iid) {
-    return iid < ML_LABEL_COUNT ? &obj->instances[iid] : NULL;
+    return iid < ei_wrapper_get_classifier_label_count() ? &obj->instances[iid]
+                                                         : NULL;
+}
+
+static void result_ready_cb(int err) {
+    assert(INSTALLED_OBJ);
+    if (err) {
+        LOG_ERR("Edge Impulse Result ready callback returned error (err: %d)",
+                err);
+        return;
+    }
+
+    const char *label;
+    float value;
+    size_t res;
+
+    // Results are ordered based on descending classification value.
+    // First and the most probable classification result is used.
+    err = ei_wrapper_get_next_classification_result(&label, &value, &res);
+
+    if (err == 0) {
+        SYNCHRONIZED(INSTALLED_OBJ->instance_state_mtx) {
+            LOG_INF("Edge Impulse classified: %.2f, Label: %s", value, label);
+
+            for (size_t i = 0; i < ei_wrapper_get_classifier_label_count();
+                 i++) {
+                pattern_detector_instance_t *it = &INSTALLED_OBJ->instances[i];
+                if (it->iid == res) {
+                    it->curr_state.detector_state = true;
+                    it->curr_state.detector_counter++;
+                    led_on(i);
+                } else {
+                    it->curr_state.detector_state = false;
+                    led_off(i);
+                }
+            }
+        }
+    } else {
+        LOG_ERR("Edge Impulse cannot get classification results (err: %d)",
+                err);
+    }
+
+    // Invocation of ei_wrapper_start_prediction restarts prediction results.
+    err = ei_wrapper_start_prediction(1, 0);
+    if (err) {
+        LOG_INF("Edge Impulse cannot start prediction (err: %d)", err);
+    } else {
+        LOG_INF("Edge Impulse prediction started...");
+    }
 }
 
 static void measure_accel_handler(struct k_work *work) {
-    assert(ML_SAMPLES_PER_FRAME == CH_COUNT);
+    assert(ei_wrapper_get_frame_size() == CH_COUNT);
 
     struct k_work_delayable *dwork = k_work_delayable_from_work(work);
     pattern_detector_object_t *obj =
@@ -147,41 +197,16 @@ static void measure_accel_handler(struct k_work *work) {
         return;
     }
 
+    float fvalues[CH_COUNT];
     for (size_t i = 0; i < CH_COUNT; i++) {
-        obj->inference_data[obj->next_sample_no * CH_COUNT + i] =
-                (float) sensor_value_to_double(&values[i]);
+        fvalues[i] = (float) sensor_value_to_double(&values[i]);
     }
 
-    if (++obj->next_sample_no == ML_SAMPLE_COUNT) {
-        obj->next_sample_no = 0;
-
-        int res = run_ml_inference(obj->inference_data);
-
-        SYNCHRONIZED(obj->instance_state_mtx) {
-            if (res < 0) {
-                LOG_INF("No classification");
-
-                for (size_t i = 0; i < ML_LABEL_COUNT; i++) {
-                    pattern_detector_instance_t *it = &obj->instances[i];
-                    it->curr_state.detector_state = false;
-                    led_off(i);
-                }
-            } else {
-                LOG_INF("Classified: %s", ML_LABELS[res]);
-
-                for (size_t i = 0; i < ML_LABEL_COUNT; i++) {
-                    pattern_detector_instance_t *it = &obj->instances[i];
-                    if (it->iid == res) {
-                        it->curr_state.detector_state = true;
-                        it->curr_state.detector_counter++;
-                        led_on(i);
-                    } else {
-                        it->curr_state.detector_state = false;
-                        led_off(i);
-                    }
-                }
-            }
-        }
+    int err = ei_wrapper_add_data(fvalues, CH_COUNT);
+    if (err) {
+        LOG_ERR("Cannot provide input data (err: %d)", err);
+        LOG_ERR("Increase CONFIG_EI_WRAPPER_DATA_BUF_SIZE");
+        return;
     }
 
     schedule_next_measure(obj);
@@ -198,7 +223,7 @@ static int list_instances(anjay_t *anjay,
                           anjay_dm_list_ctx_t *ctx) {
     (void) anjay;
 
-    for (size_t i = 0; i < ML_LABEL_COUNT; i++) {
+    for (size_t i = 0; i < ei_wrapper_get_classifier_label_count(); i++) {
         anjay_dm_emit(ctx, i);
     }
 
@@ -207,12 +232,12 @@ static int list_instances(anjay_t *anjay,
 
 static int init_instance(pattern_detector_instance_t *inst, anjay_iid_t iid) {
     assert(iid != ANJAY_ID_INVALID);
-    assert(iid < ML_LABEL_COUNT);
+    assert(iid < ei_wrapper_get_classifier_label_count());
 
     inst->iid = iid;
     inst->curr_state = INITIAL_STATE;
     inst->cached_state = INITIAL_STATE;
-    inst->pattern_name = ML_LABELS[iid];
+    inst->pattern_name = ei_wrapper_get_classifier_label(iid);
 
     return 0;
 }
@@ -282,15 +307,38 @@ static const anjay_dm_object_def_t OBJ_DEF = {
 };
 
 const anjay_dm_object_def_t **pattern_detector_object_create(void) {
+    assert(INSTALLED_OBJ == NULL);
+
     static const struct device *dev = DEVICE_DT_GET(ACCELEROMETER_NODE);
     if (!device_is_ready(dev)) {
         return NULL;
     }
 
+    int err;
+    if (!wrapper_initialized) {
+        err = ei_wrapper_init(result_ready_cb);
+        if (err) {
+            LOG_INF("Edge Impulse wrapper failed to initialize (err: %d)", err);
+            return NULL;
+        } else {
+            LOG_INF("Edge Impulse wrapper initialized.");
+            LOG_INF("FRAME SIZE: %d", ei_wrapper_get_frame_size());
+            LOG_INF("WINDOW SIZE: %d", ei_wrapper_get_window_size());
+            LOG_INF("FREQUENCY: %d", ei_wrapper_get_classifier_frequency());
+            LOG_INF("LABELS: %d", ei_wrapper_get_classifier_label_count());
+            wrapper_initialized = true;
+        };
+    }
+
+    // conterintuitively it's called upfront to simplify cleanup
+    err = ei_wrapper_start_prediction(0, 0);
+    if (err) {
+        LOG_INF("Edge Impulse cannot schedule prediction (err: %d)", err);
+    }
+    LOG_INF("Edge Impulse prediction scheduled...");
+
     pattern_detector_object_t *obj = (pattern_detector_object_t *) avs_calloc(
-            1,
-            sizeof(pattern_detector_object_t)
-                    + ML_SAMPLE_COUNT * ML_SAMPLES_PER_FRAME * sizeof(float));
+            1, sizeof(pattern_detector_object_t));
     if (!obj) {
         return NULL;
     }
@@ -298,22 +346,27 @@ const anjay_dm_object_def_t **pattern_detector_object_create(void) {
     obj->dev = dev;
 
     obj->instances = (pattern_detector_instance_t *) avs_calloc(
-            ML_LABEL_COUNT, sizeof(pattern_detector_instance_t));
+            ei_wrapper_get_classifier_label_count(),
+            sizeof(pattern_detector_instance_t));
     if (!obj->instances) {
-        pattern_detector_object_release(&obj->def);
+        avs_free(obj);
         return NULL;
     }
 
-    for (size_t i = 0; i < ML_LABEL_COUNT; i++) {
+    for (size_t i = 0; i < ei_wrapper_get_classifier_label_count(); i++) {
         if (!add_instance(obj, i)) {
-            pattern_detector_object_release(&obj->def);
+            avs_free(obj->instances);
+            avs_free(obj);
             return NULL;
         }
     }
+
+    // Edge Impulse wrapper is connected to one object
+    INSTALLED_OBJ = obj;
+
     k_mutex_init(&obj->instance_state_mtx);
 
     k_work_init_delayable(&obj->measure_accel_dwork, measure_accel_handler);
-    obj->next_sample_no = 0;
     obj->last_run_timestamp = k_uptime_get();
     schedule_next_measure(obj);
 
@@ -329,7 +382,7 @@ void pattern_detector_object_update(anjay_t *anjay,
     pattern_detector_object_t *obj = get_obj(def);
 
     SYNCHRONIZED(obj->instance_state_mtx) {
-        for (size_t i = 0; i < ML_LABEL_COUNT; i++) {
+        for (size_t i = 0; i < ei_wrapper_get_classifier_label_count(); i++) {
             pattern_detector_instance_t *it = &obj->instances[i];
 
             if (it->cached_state.detector_state
@@ -354,6 +407,14 @@ void pattern_detector_object_release(const anjay_dm_object_def_t **def) {
     if (def) {
         pattern_detector_object_t *obj = get_obj(def);
         k_work_cancel_delayable_sync(&obj->measure_accel_dwork, &obj->sync);
+
+        bool cancelled;
+        while (ei_wrapper_clear_data(&cancelled) == -EBUSY) {
+            k_sleep(K_MSEC(25));
+        }
+
+        INSTALLED_OBJ = NULL;
+
         avs_free(obj->instances);
         avs_free(obj);
     }

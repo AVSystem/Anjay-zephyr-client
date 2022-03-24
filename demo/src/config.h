@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,23 +20,18 @@
 
 #include <shell/shell.h>
 
-// To preserve backward compatibility, do not remove any of these and add new
-// options IDs right before _OPTION_STRING_END.
-typedef enum {
 #ifdef CONFIG_WIFI
-    OPTION_SSID,
-    OPTION_PASSWORD,
+#    define OPTION_KEY_SSID wifi_ssid
+#    define OPTION_KEY_PASSWORD wifi_password
 #endif // CONFIG_WIFI
-    OPTION_URI,
-    OPTION_EP_NAME,
-    OPTION_PSK,
-    OPTION_BOOTSTRAP,
+#define OPTION_KEY_URI uri
+#define OPTION_KEY_EP_NAME endpoint
+#define OPTION_KEY_PSK psk
+#define OPTION_KEY_BOOTSTRAP bootstrap
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
-    OPTION_GPS_NRF_PRIO_MODE_TIMEOUT,
-    OPTION_GPS_NRF_PRIO_MODE_COOLDOWN,
+#    define OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT gps_prio_mode_timeout
+#    define OPTION_KEY_GPS_NRF_PRIO_MODE_COOLDOWN gps_prio_mode_cooldown
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
-    _OPTION_STRING_END
-} option_id_t;
 
 void config_init(const struct shell *shell);
 void config_save(const struct shell *shell);
@@ -45,10 +40,7 @@ void config_default_init(void);
 
 void config_print_summary(const struct shell *shell);
 
-int config_set_option(const struct shell *shell,
-                      size_t argc,
-                      char **argv,
-                      option_id_t option);
+int config_set_option(const struct shell *shell, size_t argc, char **argv);
 
 const char *config_get_endpoint_name(void);
 

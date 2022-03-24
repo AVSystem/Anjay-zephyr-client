@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,10 @@
  */
 
 #include <devicetree.h>
-#include <logging/log.h>
 #include <stdlib.h>
 #include <sys/printk.h>
 #include <version.h>
 
-#include <drivers/entropy.h>
 #include <net/dns_resolve.h>
 #include <net/sntp.h>
 #ifdef CONFIG_POSIX_API
@@ -44,9 +42,7 @@
 
 #include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_prng.h>
-LOG_MODULE_REGISTER(anjay);
 
-#include "inference.h"
 #include "led.h"
 
 #include "objects/objects.h"
@@ -59,41 +55,6 @@ static const anjay_dm_object_def_t **PATTERN_DETECTOR_OBJ;
 
 static struct k_thread ANJAY_THREAD;
 K_THREAD_STACK_DEFINE(ANJAY_STACK, ANJAY_THREAD_STACK_SIZE);
-
-static void
-log_handler(avs_log_level_t level, const char *module, const char *message) {
-    switch (level) {
-    case AVS_LOG_TRACE:
-    case AVS_LOG_DEBUG:
-        LOG_DBG("%s", message);
-        break;
-
-    case AVS_LOG_INFO:
-        LOG_INF("%s", message);
-        break;
-
-    case AVS_LOG_WARNING:
-        LOG_WRN("%s", message);
-        break;
-
-    case AVS_LOG_ERROR:
-        LOG_ERR("%s", message);
-        break;
-
-    default:
-        break;
-    }
-}
-
-int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
-    assert(dev);
-    if (entropy_get_entropy((const struct device *) dev, out_buf,
-                            out_buf_len)) {
-        avs_log(zephyr_demo, ERROR, "Failed to get random bits");
-        return -1;
-    }
-    return 0;
-}
 
 #ifdef CONFIG_POSIX_API
 static void set_system_time(const struct sntp_time *time) {
@@ -161,8 +122,6 @@ void initialize_network(void) {
     avs_log(zephyr_demo, INFO, "Connected to network");
 }
 
-static avs_crypto_prng_ctx_t *PRNG_CTX;
-
 void run_anjay(void *arg1, void *arg2, void *arg3) {
     ARG_UNUSED(arg1);
     ARG_UNUSED(arg2);
@@ -171,8 +130,7 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
     const anjay_configuration_t config = {
         .endpoint_name = CONFIG_ANJAY_CLIENT_ENDPOINT_NAME,
         .in_buffer_size = 4000,
-        .out_buffer_size = 4000,
-        .prng_ctx = PRNG_CTX
+        .out_buffer_size = 4000
     };
 
     anjay_t *anjay = anjay_new(&config);
@@ -243,30 +201,12 @@ cleanup:
 }
 
 void main(void) {
-    avs_log_set_handler(log_handler);
-    avs_log_set_default_level(AVS_LOG_INFO);
-
     led_init();
 
     initialize_network();
 
     k_sleep(K_SECONDS(1));
     synchronize_clock();
-
-    const struct device *entropy_dev =
-            device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
-    if (!entropy_dev) {
-        avs_log(zephyr_demo, ERROR, "Failed to acquire entropy device");
-        exit(1);
-    }
-
-    PRNG_CTX = avs_crypto_prng_new(entropy_callback,
-                                   (void *) (intptr_t) entropy_dev);
-
-    if (!PRNG_CTX) {
-        avs_log(zephyr_demo, ERROR, "Failed to initialize PRNG ctx");
-        exit(1);
-    }
 
     k_thread_create(&ANJAY_THREAD, ANJAY_STACK, ANJAY_THREAD_STACK_SIZE,
                     run_anjay, NULL, NULL, NULL, ANJAY_THREAD_PRIO, 0,

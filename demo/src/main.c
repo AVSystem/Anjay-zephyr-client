@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,10 @@
  */
 
 #include <devicetree.h>
-#include <logging/log.h>
 #include <stdlib.h>
 #include <sys/printk.h>
 #include <version.h>
 
-#include <drivers/entropy.h>
 #include <net/dns_resolve.h>
 #include <net/sntp.h>
 #include <posix/time.h>
@@ -32,13 +30,14 @@
 
 #include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_prng.h>
-LOG_MODULE_REGISTER(anjay);
 
 #include "common.h"
+#include "utils.h"
 
 #include "config.h"
 #include "default_config.h"
 
+#include "firmware_update.h"
 #include "gps.h"
 #include "objects/objects.h"
 #include "status_led.h"
@@ -53,11 +52,11 @@ LOG_MODULE_REGISTER(anjay);
 #    include <modem/lte_lc.h>
 #endif // CONFIG_WIFI
 
-#if defined(CONFIG_BOARD_NRF9160DK_NRF9160NS) \
-        || defined(CONFIG_BOARD_THINGY91_NRF9160NS)
+#if defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) \
+        || defined(CONFIG_BOARD_THINGY91_NRF9160_NS)
 #    include <date_time.h>
-#endif // CONFIG_BOARD_NRF9160DK_NRF9160NS ||
-       // defined(CONFIG_BOARD_THINGY91_NRF9160NS)
+#endif // CONFIG_BOARD_NRF9160DK_NRF9160_NS ||
+       // defined(CONFIG_BOARD_THINGY91_NRF9160_NS)
 
 static const anjay_dm_object_def_t **BUZZER_OBJ;
 static const anjay_dm_object_def_t **LED_COLOR_LIGHT_OBJ;
@@ -65,46 +64,17 @@ static const anjay_dm_object_def_t **LOCATION_OBJ;
 static const anjay_dm_object_def_t **SWITCH_OBJ;
 static const anjay_dm_object_def_t **DEVICE_OBJ;
 
+volatile atomic_bool DEVICE_INITIALIZED;
+
 anjay_t *volatile ANJAY;
+K_MUTEX_DEFINE(ANJAY_MUTEX);
 volatile atomic_bool ANJAY_RUNNING;
 
 struct k_thread ANJAY_THREAD;
+volatile bool ANJAY_THREAD_RUNNING;
+K_MUTEX_DEFINE(ANJAY_THREAD_RUNNING_MUTEX);
+K_CONDVAR_DEFINE(ANJAY_THREAD_RUNNING_CONDVAR);
 K_THREAD_STACK_DEFINE(ANJAY_STACK, ANJAY_THREAD_STACK_SIZE);
-
-static void
-log_handler(avs_log_level_t level, const char *module, const char *message) {
-    switch (level) {
-    case AVS_LOG_TRACE:
-    case AVS_LOG_DEBUG:
-        LOG_DBG("%s", message);
-        break;
-
-    case AVS_LOG_INFO:
-        LOG_INF("%s", message);
-        break;
-
-    case AVS_LOG_WARNING:
-        LOG_WRN("%s", message);
-        break;
-
-    case AVS_LOG_ERROR:
-        LOG_ERR("%s", message);
-        break;
-
-    default:
-        break;
-    }
-}
-
-int entropy_callback(unsigned char *out_buf, size_t out_buf_len, void *dev) {
-    assert(dev);
-    if (entropy_get_entropy((const struct device *) dev, out_buf,
-                            out_buf_len)) {
-        avs_log(zephyr_demo, ERROR, "Failed to get random bits");
-        return -1;
-    }
-    return 0;
-}
 
 #ifdef CONFIG_BOARD_DISCO_L475_IOT1
 static void set_system_time(const struct sntp_time *time) {
@@ -238,14 +208,25 @@ void initialize_network(void) {
     avs_log(zephyr_demo, INFO, "Connected to network");
 }
 
-static avs_crypto_prng_ctx_t *PRNG_CTX;
-
 static anjay_t *initialize_anjay(void) {
     const anjay_configuration_t config = {
         .endpoint_name = config_get_endpoint_name(),
         .in_buffer_size = 4000,
         .out_buffer_size = 4000,
-        .prng_ctx = PRNG_CTX
+        .udp_dtls_hs_tx_params = &(const avs_net_dtls_handshake_timeouts_t) {
+            // Change the default DTLS handshake parameters so that "anjay stop"
+            // is more responsive; note that an exponential backoff is
+            // implemented, so the maximum of 8 seconds adds up to up to 15
+            // seconds in total.
+            .min = {
+                .seconds = 1,
+                .nanoseconds = 0
+            },
+            .max = {
+                .seconds = 8,
+                .nanoseconds = 0
+            }
+        }
     };
 
     anjay_t *anjay = anjay_new(&config);
@@ -306,6 +287,13 @@ static anjay_t *initialize_anjay(void) {
         }
     }
 
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+    if (fw_update_install(anjay)) {
+        avs_log(zephyr_demo, ERROR, "Failed to initialize fw update module");
+        goto error;
+    }
+#endif // CONFIG_ANJAY_CLIENT_FOTA
+
     return anjay;
 error:
     anjay_delete(anjay);
@@ -319,25 +307,41 @@ void run_anjay(void *arg1, void *arg2, void *arg3) {
     ARG_UNUSED(arg3);
 
     anjay_t *anjay = initialize_anjay();
-    if (!anjay) {
-        return;
+    if (anjay) {
+        avs_log(zephyr_demo, INFO, "Successfully created thread");
+
+        SYNCHRONIZED(ANJAY_MUTEX) {
+            ANJAY = anjay;
+        }
+
+        // anjay stop could be called immediately after anjay start
+        if (atomic_load(&ANJAY_RUNNING)) {
+            update_objects(anjay_get_scheduler(anjay), &anjay);
+            anjay_event_loop_run(anjay,
+                                 avs_time_duration_from_scalar(1, AVS_TIME_S));
+        }
+
+        SYNCHRONIZED(ANJAY_MUTEX) {
+            ANJAY = NULL;
+        }
+
+        anjay_delete(anjay);
+        release_objects();
+
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+        if (fw_update_requested()) {
+            fw_update_reboot();
+        }
+#endif // CONFIG_ANJAY_CLIENT_FOTA
     }
 
-    avs_log(zephyr_demo, INFO, "Successfully created thread");
-
-    ANJAY = anjay;
-    update_objects(anjay_get_scheduler(anjay), &anjay);
-    anjay_event_loop_run(ANJAY, avs_time_duration_from_scalar(1, AVS_TIME_S));
-    ANJAY = NULL;
-
-    anjay_delete(anjay);
-    release_objects();
+    SYNCHRONIZED(ANJAY_THREAD_RUNNING_MUTEX) {
+        ANJAY_THREAD_RUNNING = false;
+        k_condvar_broadcast(&ANJAY_THREAD_RUNNING_CONDVAR);
+    }
 }
 
 void main(void) {
-    avs_log_set_handler(log_handler);
-    avs_log_set_default_level(DEFAULT_LOG_LEVEL);
-
     config_init(shell_backend_uart_get_ptr());
 
     status_led_init();
@@ -348,31 +352,31 @@ void main(void) {
     initialize_gps();
 #endif // CONFIG_ANJAY_CLIENT_GPS
 
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+    fw_update_apply();
+#endif // CONFIG_ANJAY_CLIENT_FOTA
+
     synchronize_clock();
 
-    const struct device *entropy_dev =
-            device_get_binding(DT_CHOSEN_ZEPHYR_ENTROPY_LABEL);
-    if (!entropy_dev) {
-        avs_log(zephyr_demo, ERROR, "Failed to acquire entropy device");
-        exit(1);
-    }
-
-    PRNG_CTX = avs_crypto_prng_new(entropy_callback,
-                                   (void *) (intptr_t) entropy_dev);
-
-    if (!PRNG_CTX) {
-        avs_log(zephyr_demo, ERROR, "Failed to initialize PRNG ctx");
-        exit(1);
-    }
-
+    atomic_store(&DEVICE_INITIALIZED, true);
     atomic_store(&ANJAY_RUNNING, true);
 
     while (true) {
         if (atomic_load(&ANJAY_RUNNING)) {
-            k_thread_create(&ANJAY_THREAD, ANJAY_STACK, ANJAY_THREAD_STACK_SIZE,
-                            run_anjay, NULL, NULL, NULL, ANJAY_THREAD_PRIO, 0,
-                            K_NO_WAIT);
-            k_thread_join(&ANJAY_THREAD, K_FOREVER);
+            SYNCHRONIZED(ANJAY_THREAD_RUNNING_MUTEX) {
+                k_thread_create(&ANJAY_THREAD, ANJAY_STACK,
+                                ANJAY_THREAD_STACK_SIZE, run_anjay, NULL, NULL,
+                                NULL, ANJAY_THREAD_PRIO, 0, K_NO_WAIT);
+                ANJAY_THREAD_RUNNING = true;
+
+                while (ANJAY_THREAD_RUNNING) {
+                    k_condvar_wait(&ANJAY_THREAD_RUNNING_CONDVAR,
+                                   &ANJAY_THREAD_RUNNING_MUTEX, K_FOREVER);
+                }
+
+                k_thread_join(&ANJAY_THREAD, K_FOREVER);
+            }
+
             shell_print(shell_backend_uart_get_ptr(), "Anjay stopped");
         } else {
             k_sleep(K_SECONDS(1));

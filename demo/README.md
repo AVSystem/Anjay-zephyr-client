@@ -6,16 +6,18 @@ Project containing all implemented features, intended to be a showcase.
 This folder contains LwM2M Client application example, which targets
 [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK) and [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91).
 
+There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
+
 It's possible to run the demo on other boards of your choice, by adding appropriate configuration files and aliases for available sensors/peripherals (more info below).
 
 The following LwM2M Objects are supported:
 
-| Target         | Objects                                                                                                                                                |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Common         | Security (/0)<br>Server (/1)<br>Device (/3)<br>Push button (/3347)                                                                                     |
-| B-L475E-IOT01A | Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334) |
-| nRF9160DK      | Location (/6)<br>On/Off switch (/3342)                                                                                                                 |
-| Thingy:91      | Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420)    |
+| Target         | Objects                                                                                                                                                                     |
+|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Common         | Security (/0)<br>Server (/1)<br>Device (/3)<br>Push button (/3347)                                                                                                          |
+| B-L475E-IOT01A | Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)                      |
+| nRF9160DK      | **Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (3342)                                                                                                               |
+| Thingy:91      | **Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420) |
 
 ## Compilation
 
@@ -37,7 +39,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160ns` or `west build -b thingy91_nrf9160ns` in `demo` directory, respectively.
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `west build -b thingy91_nrf9160_ns` in `demo` directory, respectively.
 
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.
@@ -47,15 +49,20 @@ Now you can compile the project using `west build -b nrf9160dk_nrf9160ns` or `we
 > ```
 > [More about managing west workspace through manifests can be found here.](https://docs.zephyrproject.org/latest/guides/west/manifest.html)
 
+### Compiling for external flash usage
+
+For nRF9160DK hardware revisions 0.14.0 and up, an alternate configuration that puts the MCUboot secondary partition on the external flash instead of dividing the internal flash space is available.
+
+To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf`.
+
 ## Flashing the target
 
 After successful build you can flash the target using `west flash`.
 
-> **__NOTE (Thingy:91):__**
-> Thingy:91 doesn't have an onboard debug probe (and MCUBoot is not supported), so you must use an external J-link programmer with support for Arm Cortex-M33 devices.
-> 
-> Make sure that SWD SELECT (SW2) switch is set to NRF91, connect the Thingy:91 to a programmer and run `west flash`.
-
+> **__NOTE:__**
+> The nRF91 targets require the modem firmware to be upgraded to version 1.3.1 or later. See the [Updating the modem firmware](https://infocenter.nordicsemi.com/index.jsp?topic=%2Fnan_041%2FAPP%2Fnan_production_programming%2Fmodem_update.html) article for more information.
+>
+> Alternatively, you can remove the ``udp_dtls_hs_tx_params`` assignment in the ``initialize_anjay()`` function in ``main.c`` to make it work on older versions. However, the ``anjay stop`` command may then take an excessive amount of time. Please also note that the application has not been tested with older modem firmware versions.
 
 ## Running the demo on other boards
 
@@ -102,7 +109,20 @@ Using serial port terminal, you can manage Anjay client using built-in Zephyr sh
 uart:~$ anjay
 anjay - Anjay commands
 Subcommands:
-  start   :Save config and start Anjay
-  stop    :Stop Anjay
-  config  :Configure Anjay params
+  start                :Save config and start Anjay
+  stop                 :Stop Anjay
+  config               :Configure Anjay params
+  session_cache_purge  :Remove the TLS session data cached in the nRF modem
 ```
+
+## Tips and tricks
+
+1. The TLS session cache in the nRF modem is enabled by default in anjay-zephyr.
+   It might cause some issues when trying to connect to a server with changed
+   credentials. To solve the issue, use `anjay session_cache_purge` shell
+   command which cleans up the cache, so the new credentials will be used
+   for the next connection.
+
+## Upgrading the firmware over-the-air
+
+To upgrade the firmware, upload `build/zephyr/app_update.bin` file using standard means of LwM2M Firmware Update object.

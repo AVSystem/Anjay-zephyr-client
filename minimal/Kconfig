@@ -14,7 +14,7 @@ config ANJAY_CLIENT_ENDPOINT_NAME
 
 config ANJAY_CLIENT_VERSION
     string "Client Version"
-    default "21.10.1"
+    default "22.03"
 
 config ANJAY_CLIENT_SERVER_URI
     string "Server URI"

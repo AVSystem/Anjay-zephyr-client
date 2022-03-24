@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#if !(defined(CONFIG_BOARD_NRF9160DK_NRF9160NS) \
-      || defined(CONFIG_BOARD_THINGY91_NRF9160NS))
+#if !(defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) \
+      || defined(CONFIG_BOARD_THINGY91_NRF9160_NS))
 #    error "This GPS implementation is not supported by selected board"
-#endif // !(defined(CONFIG_BOARD_NRF9160DK_NRF9160NS) ||
-       // defined(CONFIG_BOARD_THINGY91_NRF9160NS))
+#endif // !(defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) ||
+       // defined(CONFIG_BOARD_THINGY91_NRF9160_NS))
 
 #include <kernel.h>
 #include <logging/log.h>
-#include <modem/at_cmd.h>
+#include <nrf_modem_at.h>
 #include <nrf_modem_gnss.h>
 #include <sys/timeutil.h>
 #include <zephyr.h>
@@ -41,13 +41,13 @@ LOG_MODULE_REGISTER(gps_nrf);
 // https://github.com/nrfconnect/sdk-nrf/blob/master/samples/nrf9160/gps/src/main.c
 static const char *const INIT_AT_COMMANDS[] = {
 // AT%XMAGPIO controls antenna tuner
-#ifdef CONFIG_BOARD_THINGY91_NRF9160NS
+#ifdef CONFIG_BOARD_THINGY91_NRF9160_NS
     "AT%XMAGPIO=1,1,1,7,1,746,803,2,698,748,2,1710,2200,3,824,894,4,880,960,5,"
     "791,849,7,1565,1586",
-#endif // CONFIG_BOARD_THINGY91_NRF9160NS
-#ifdef CONFIG_BOARD_NRF9160DK_NRF9160NS
+#endif // CONFIG_BOARD_THINGY91_NRF9160_NS
+#ifdef CONFIG_BOARD_NRF9160DK_NRF9160_NS
     "AT%XMAGPIO=1,0,0,1,1,1574,1577",
-#endif // CONFIG_BOARD_NRF9160DK_NRF9160NS
+#endif // CONFIG_BOARD_NRF9160DK_NRF9160_NS
 
 // AT%XCOEX0 controls external Low-Noise Amplifier
 #ifdef CONFIG_ANJAY_CLIENT_EXTERNAL_GPS_ANTENNA
@@ -93,8 +93,11 @@ gnss_datetime_to_timestamp(const struct nrf_modem_gnss_datetime *datetime) {
 void prio_mode_disable(void) {
     LOG_INF("Disabling gnss_prio_mode");
 
-    // NOTE: anjay_transport_exit_offline() contains an internal null-guard
-    anjay_transport_exit_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
+    SYNCHRONIZED(ANJAY_MUTEX) {
+        if (ANJAY) {
+            anjay_transport_exit_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
+        }
+    }
 
     if (nrf_modem_gnss_prio_mode_disable()) {
         LOG_ERR("Couldn't disable gnss_prio_mode");
@@ -142,8 +145,6 @@ static void incoming_pvt_work_handler(struct k_work *work) {
                 && ++interrupted_fixes_in_row
                                == INTERRUPTED_FIXES_WARN_THRESHOLD) {
             interrupted_fixes_in_row = 0;
-            LOG_WRN("GPS was interrupted multiple times by the LTE modem when "
-                    "producing a fix");
 
             uint32_t gps_prio_mode_timeout =
                     config_get_gps_nrf_prio_mode_timeout();
@@ -151,14 +152,21 @@ static void incoming_pvt_work_handler(struct k_work *work) {
                 return;
             }
 
+            LOG_WRN("GPS was interrupted multiple times by the LTE modem when "
+                    "producing a fix");
+
             if (nrf_modem_gnss_prio_mode_enable()) {
                 LOG_ERR("Couldn't enable gnss_prio_mode");
                 return;
             }
             LOG_WRN("gnss_prio_mode enabled");
 
-            // NOTE: anjay_transport_enter_offline() contains a null-guard
-            anjay_transport_enter_offline(ANJAY, ANJAY_TRANSPORT_SET_IP);
+            SYNCHRONIZED(ANJAY_MUTEX) {
+                if (ANJAY) {
+                    anjay_transport_enter_offline(ANJAY,
+                                                  ANJAY_TRANSPORT_SET_IP);
+                }
+            }
 
             k_work_schedule(&prio_mode_disable_dwork,
                             K_SECONDS(gps_prio_mode_timeout));
@@ -186,7 +194,7 @@ static void gnss_event_handler(int event) {
 
 static int config_at(void) {
     for (size_t i = 0; i < ARRAY_SIZE(INIT_AT_COMMANDS); i++) {
-        if (at_cmd_write(INIT_AT_COMMANDS[i], NULL, 0, NULL)) {
+        if (nrf_modem_at_printf("%s", INIT_AT_COMMANDS[i])) {
             LOG_ERR("Failed to write initial AT command: %s",
                     INIT_AT_COMMANDS[i]);
             return -1;
@@ -197,8 +205,7 @@ static int config_at(void) {
 }
 
 int initialize_gps(void) {
-    if (config_at() || nrf_modem_gnss_init()
-            || nrf_modem_gnss_event_handler_set(gnss_event_handler)
+    if (config_at() || nrf_modem_gnss_event_handler_set(gnss_event_handler)
             || nrf_modem_gnss_fix_retry_set(0)
             || nrf_modem_gnss_fix_interval_set(1) || nrf_modem_gnss_start()) {
         LOG_ERR("Failed to initialize GPS interface");

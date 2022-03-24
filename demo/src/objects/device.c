@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <power/reboot.h>
+#include <sys/reboot.h>
 #include <zephyr.h>
 
 #include "../default_config.h"
@@ -119,6 +119,9 @@ typedef struct device_object_struct {
     const anjay_dm_object_def_t *def;
 
     device_id_t serial_number;
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+    char fw_version[BOOT_IMG_VER_STRLEN_MAX];
+#endif // CONFIG_ANJAY_CLIENT_FOTA
     bool do_reboot;
 } device_object_t;
 
@@ -183,7 +186,11 @@ static int resource_read(anjay_t *anjay,
 
     case RID_FIRMWARE_VERSION:
         assert(riid == ANJAY_ID_INVALID);
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+        return anjay_ret_string(ctx, obj->fw_version);
+#else  // CONFIG_ANJAY_CLIENT_FOTA
         return anjay_ret_string(ctx, CLIENT_VERSION);
+#endif // CONFIG_ANJAY_CLIENT_FOTA
 
     case RID_ERROR_CODE:
         assert(riid == 0);
@@ -305,6 +312,12 @@ const anjay_dm_object_def_t **device_object_create(void) {
     if (get_device_id(&obj->serial_number)) {
         obj->serial_number.value[0] = '\0';
     }
+
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+    if (get_fw_version_image_0(obj->fw_version, sizeof(obj->fw_version))) {
+        obj->fw_version[0] = '\0';
+    }
+#endif // CONFIG_ANJAY_CLIENT_FOTA
 
     return &obj->def;
 }

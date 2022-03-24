@@ -1,4 +1,4 @@
-# Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.13.1)
+
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(anjay_zephyr_demo)
 set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
@@ -40,10 +41,29 @@ set(app_common_sources
     src/objects/led_color_light.c)
 
 if(CONFIG_ANJAY_CLIENT_GPS_NRF)
-    target_sources(app PRIVATE
-                   ${app_common_sources}
-                   src/gps_impl/gps_nrf.c)
-else()
-    target_sources(app PRIVATE
-                   ${app_common_sources})
+    list(APPEND app_common_sources
+         src/gps_impl/gps_nrf.c)
 endif()
+
+if(CONFIG_ANJAY_CLIENT_FOTA)
+    # defined in nrf/cmake/partition_manager.cmake
+    if(NOT EXISTS "${static_configuration_file}")
+        set(pm_missing_message "Missing static partition manager file for board: ${BOARD}")
+
+        if(ACTIVE_BOARD_REVISION)
+            set(pm_missing_message "${pm_missing_message}, rev: ${ACTIVE_BOARD_REVISION}")
+        endif()
+
+        if(CONF_FILE_BUILD_TYPE)
+            set(pm_missing_message "${pm_missing_message}, build type: ${CONF_FILE_BUILD_TYPE}")
+        endif()
+
+        message(FATAL_ERROR "${pm_missing_message}")
+    endif()
+
+    list(APPEND app_common_sources
+         src/firmware_update.c)
+endif()
+
+target_sources(app PRIVATE
+               ${app_common_sources})

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,27 +29,24 @@
 #include <drivers/flash.h>
 #include <drivers/hwinfo.h>
 #include <drivers/uart.h>
-#include <fs/fs.h>
-#include <fs/littlefs.h>
-#include <storage/flash_map.h>
+#include <settings/settings.h>
 
 #include "config.h"
 #include "default_config.h"
 #include "utils.h"
 
-#define MOUNT_POINT "/lfs"
-#define CONFIG_FILE_NAME "config"
-#define CONFIG_FILE_PATH (MOUNT_POINT "/" CONFIG_FILE_NAME)
+#define SETTINGS_ROOT_NAME "anjay"
+#define SETTINGS_NAME(Name) SETTINGS_ROOT_NAME "/" AVS_QUOTE_MACRO(Name)
 
 #define EP_NAME_PREFIX "anjay-zephyr-demo"
 
-// storage is defined in devicetree
-FS_LITTLEFS_DECLARE_DEFAULT_CONFIG(storage);
+struct anjay_client_option;
+typedef struct anjay_client_option option_t;
 
 typedef int config_option_validate_t(const struct shell *shell,
                                      const char *value,
                                      size_t value_len,
-                                     option_id_t option);
+                                     const option_t *option);
 
 typedef struct {
 #ifdef CONFIG_WIFI
@@ -68,12 +65,13 @@ typedef struct {
 
 static app_config_t APP_CONFIG;
 
-typedef struct {
+struct anjay_client_option {
+    const char *const key;
     const char *const desc;
     char *const value;
     size_t value_capacity;
     config_option_validate_t *validator;
-} option_t;
+};
 
 static config_option_validate_t string_validate;
 static config_option_validate_t flag_validate;
@@ -81,189 +79,87 @@ static config_option_validate_t uint32_validate;
 
 static option_t STRING_OPTIONS[] = {
 #ifdef CONFIG_WIFI
-    [OPTION_SSID] = { "Wi-Fi SSID", APP_CONFIG.ssid, sizeof(APP_CONFIG.ssid),
-                      string_validate },
-    [OPTION_PASSWORD] = { "Wi-Fi password", APP_CONFIG.password,
-                          sizeof(APP_CONFIG.password), string_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_SSID), "Wi-Fi SSID", APP_CONFIG.ssid,
+      sizeof(APP_CONFIG.ssid), string_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_PASSWORD), "Wi-Fi password",
+      APP_CONFIG.password, sizeof(APP_CONFIG.password), string_validate },
 #endif // CONFIG_WIFI
-    [OPTION_URI] = { "LwM2M Server URI", APP_CONFIG.uri, sizeof(APP_CONFIG.uri),
-                     string_validate },
-    [OPTION_EP_NAME] = { "Endpoint name", APP_CONFIG.ep_name,
-                         sizeof(APP_CONFIG.ep_name), string_validate },
-    [OPTION_PSK] = { "PSK", APP_CONFIG.psk, sizeof(APP_CONFIG.psk),
-                     string_validate },
-    [OPTION_BOOTSTRAP] = { "Bootstrap", APP_CONFIG.bootstrap,
-                           sizeof(APP_CONFIG.bootstrap), flag_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_URI), "LwM2M Server URI", APP_CONFIG.uri,
+      sizeof(APP_CONFIG.uri), string_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_EP_NAME), "Endpoint name", APP_CONFIG.ep_name,
+      sizeof(APP_CONFIG.ep_name), string_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_PSK), "PSK", APP_CONFIG.psk,
+      sizeof(APP_CONFIG.psk), string_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_BOOTSTRAP), "Bootstrap", APP_CONFIG.bootstrap,
+      sizeof(APP_CONFIG.bootstrap), flag_validate },
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
-    [OPTION_GPS_NRF_PRIO_MODE_TIMEOUT] =
-            { "GPS priority mode timeout", APP_CONFIG.gps_nrf_prio_mode_timeout,
-              sizeof(APP_CONFIG.gps_nrf_prio_mode_timeout), uint32_validate },
-    [OPTION_GPS_NRF_PRIO_MODE_COOLDOWN] =
-            { "GPS priority mode cooldown",
-              APP_CONFIG.gps_nrf_prio_mode_cooldown,
-              sizeof(APP_CONFIG.gps_nrf_prio_mode_cooldown), uint32_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT),
+      "GPS priority mode timeout", APP_CONFIG.gps_nrf_prio_mode_timeout,
+      sizeof(APP_CONFIG.gps_nrf_prio_mode_timeout), uint32_validate },
+    { AVS_QUOTE_MACRO(OPTION_KEY_GPS_NRF_PRIO_MODE_COOLDOWN),
+      "GPS priority mode cooldown", APP_CONFIG.gps_nrf_prio_mode_cooldown,
+      sizeof(APP_CONFIG.gps_nrf_prio_mode_cooldown), uint32_validate },
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 };
 
+#undef DECLARE_OPTION
+
+static int settings_set(const char *key,
+                        size_t len,
+                        settings_read_cb read_cb,
+                        void *cb_arg) {
+    if (key) {
+        for (int i = 0; i < AVS_ARRAY_SIZE(STRING_OPTIONS); ++i) {
+            if (strcmp(key, STRING_OPTIONS[i].key) == 0) {
+                if (len != STRING_OPTIONS[i].value_capacity) {
+                    return -EINVAL;
+                }
+
+                int result = read_cb(cb_arg, STRING_OPTIONS[i].value,
+                                     STRING_OPTIONS[i].value_capacity);
+                return result >= 0 ? 0 : result;
+            }
+        }
+    }
+    return -ENOENT;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(
+        anjay, SETTINGS_ROOT_NAME, NULL, settings_set, NULL, NULL);
+
 void config_print_summary(const struct shell *shell) {
     shell_print(shell, "\nCurrent Anjay config:\n");
-    int id = 0;
-    for (int i = 0; i < _OPTION_STRING_END; i++) {
-        id++;
+    for (int i = 0; i < AVS_ARRAY_SIZE(STRING_OPTIONS); i++) {
         shell_print(shell, " %s: %s", STRING_OPTIONS[i].desc,
                     STRING_OPTIONS[i].value);
     }
 }
 
-static int
-write_to_file(struct fs_file_t *file, const void *value, size_t value_len) {
-    return (fs_write(file, value, value_len) == value_len) ? 0 : -1;
-}
-
-static int open_config_file(struct fs_file_t *file, fs_mode_t flags) {
-    fs_file_t_init(file);
-    if (fs_open(file, CONFIG_FILE_PATH, flags)) {
-        avs_log(fs, ERROR, "Failed to open %s", CONFIG_FILE_PATH);
-        return -1;
-    }
-    return 0;
-}
-
-static int write_config_to_flash(void) {
-    // If file isn't removed before the write operation, sometimes it may be in
-    // invalid state after call to fs_close().
-    fs_unlink(CONFIG_FILE_PATH);
-
-    struct fs_file_t file;
-    if (open_config_file(&file, FS_O_WRITE | FS_O_CREATE)) {
-        return -1;
-    }
-
-    for (int i = 0; i < _OPTION_STRING_END; i++) {
-        size_t opt_len = strlen(STRING_OPTIONS[i].value);
-        if (write_to_file(&file, &i, sizeof(i))
-                || write_to_file(&file, &opt_len, sizeof(opt_len))
-                || write_to_file(&file, STRING_OPTIONS[i].value, opt_len)) {
-            fs_close(&file);
-            fs_unlink(CONFIG_FILE_PATH);
-            return -1;
-        }
-    }
-
-    return fs_close(&file) ? -1 : 0;
-}
-
 void config_save(const struct shell *shell) {
-    struct fs_mount_t lfs_storage_mnt = {
-        .type = FS_LITTLEFS,
-        .fs_data = &storage,
-        .storage_dev = (void *) FLASH_AREA_ID(storage),
-        .mnt_point = MOUNT_POINT,
-    };
-    struct fs_mount_t *mp = &lfs_storage_mnt;
-
-    if (fs_mount(mp) || write_config_to_flash()) {
-        shell_warn(shell, "Cannot save the config");
-    } else {
-        shell_print(shell, "Configuration successfuly saved");
-    }
-
-    fs_unmount(mp);
-}
-
-typedef enum { READ_SUCCESS, READ_EOF, READ_ERROR } read_result_t;
-
-static read_result_t
-read_from_file(struct fs_file_t *file, void *value, size_t value_len) {
-    ssize_t result = fs_read(file, value, value_len);
-    if (result == value_len) {
-        return READ_SUCCESS;
-    } else if (result == 0) {
-        return READ_EOF;
-    } else if (result > 0) {
-        avs_log(fs, ERROR, "Unexpected end of file");
-        return READ_ERROR;
-    } else { // result < 0
-        avs_log(fs, ERROR, "Read error: %d", (int) result);
-        return READ_ERROR;
-    }
-}
-
-static read_result_t read_option_id_from_file(struct fs_file_t *file,
-                                              option_id_t *out_id) {
-    int id;
-    read_result_t result = read_from_file(file, &id, sizeof(id));
-    if (result != READ_SUCCESS) {
-        return result;
-    }
-
-    if (id < 0 || id >= _OPTION_STRING_END) {
-        avs_log(fs, ERROR, "Invalid persisted option ID");
-        return READ_ERROR;
-    }
-
-    *out_id = id;
-    return READ_SUCCESS;
-}
-
-static read_result_t read_option_value_from_file(struct fs_file_t *file,
-                                                 option_id_t id) {
-    size_t opt_size;
-    read_result_t result = read_from_file(file, &opt_size, sizeof(opt_size));
-    if (result != READ_SUCCESS) {
-        return result;
-    }
-
-    if (STRING_OPTIONS[id].value_capacity <= opt_size) {
-        avs_log(fs, ERROR, "Persisted value too long");
-        return READ_ERROR;
-    }
-
-    result = read_from_file(file, STRING_OPTIONS[id].value, opt_size);
-    if (result == READ_SUCCESS) {
-        STRING_OPTIONS[id].value[opt_size] = '\0';
-    }
-
-    return result;
-}
-
-// Returns 0 if the configuration is in consistent state and -1 if it should be
-// replaced by default settings.
-static int read_config_from_flash(void) {
-    struct fs_dirent entry;
-    if (fs_stat(CONFIG_FILE_PATH, &entry) || entry.size == 0) {
-        avs_log(fs, WARNING, "%s doesn't exist", CONFIG_FILE_PATH);
-        return 0;
-    }
-
-    struct fs_file_t file;
-    if (open_config_file(&file, FS_O_READ)) {
-        return -1;
-    }
-
+    char key_buf[64];
     int result = 0;
-    while (1) {
-        option_id_t id = 0;
-        read_result_t read_result = read_option_id_from_file(&file, &id);
-        if (read_result == READ_ERROR) {
-            result = -1;
-            break;
-        } else if (read_result == READ_EOF) {
-            // EOF is expected here
-            result = 0;
-            break;
-        }
-
-        read_result = read_option_value_from_file(&file, id);
-        if (read_result != READ_SUCCESS) {
-            // EOF here means invalid persisted configuration
-            result = -1;
-            break;
+    for (size_t i = 0; !result && i < AVS_ARRAY_SIZE(STRING_OPTIONS); ++i) {
+        result = avs_simple_snprintf(key_buf, sizeof(key_buf),
+                                     SETTINGS_ROOT_NAME "/%s",
+                                     STRING_OPTIONS[i].key);
+        if (result >= 0) {
+            result = settings_save_one(key_buf,
+                                       STRING_OPTIONS[i].value,
+                                       STRING_OPTIONS[i].value_capacity);
         }
     }
 
-    fs_close(&file);
-    return result;
+    if (result) {
+        shell_warn(shell, "Cannot save the config");
+        for (size_t i = 0; i < AVS_ARRAY_SIZE(STRING_OPTIONS); ++i) {
+            result = avs_simple_snprintf(key_buf, sizeof(key_buf),
+                                         SETTINGS_ROOT_NAME "/%s",
+                                         STRING_OPTIONS[i].key);
+            if (result >= 0) {
+                settings_delete(key_buf);
+            }
+        }
+    }
 }
 
 void config_default_init(void) {
@@ -299,51 +195,45 @@ void config_default_init(void) {
 void config_init(const struct shell *shell) {
     config_default_init();
 
-    struct fs_mount_t lfs_storage_mnt = {
-        .type = FS_LITTLEFS,
-        .fs_data = &storage,
-        .storage_dev = (void *) FLASH_AREA_ID(storage),
-        .mnt_point = MOUNT_POINT,
-    };
+    if (settings_subsys_init()) {
+        shell_warn(shell, "Failed to initialize settings subsystem");
+        return;
+    }
 
-    struct fs_mount_t *mp = &lfs_storage_mnt;
-
-    if (fs_mount(mp)) {
-        shell_warn(shell,
-                   "Failed to mount %s, config persistence disabled",
-                   mp->mnt_point);
-        mp = NULL;
-    } else if (read_config_from_flash()) {
+    if (settings_load()) {
         shell_warn(shell, "Restoring default configuration");
         config_default_init();
     } else {
-        shell_print(shell, "Configuration successfuly restored");
-    }
-
-    if (mp) {
-        fs_unmount(mp);
+        shell_print(shell, "Configuration successfully restored");
     }
 }
 
-int config_set_option(const struct shell *shell,
-                      size_t argc,
-                      char **argv,
-                      option_id_t option) {
+int config_set_option(const struct shell *shell, size_t argc, char **argv) {
     if (argc != 2) {
         shell_error(shell, "Wrong number of arguments.\n");
-    }
-
-    const char *value = argv[1];
-    size_t value_len = strlen(value) + 1;
-
-    assert(STRING_OPTIONS[option].validator);
-    if (STRING_OPTIONS[option].validator(shell, value, value_len, option)) {
         return -1;
     }
 
-    memcpy(STRING_OPTIONS[option].value, value, value_len);
+    const char *key = argv[0];
+    for (size_t i = 0; i < AVS_ARRAY_SIZE(STRING_OPTIONS); ++i) {
+        if (strcmp(key, STRING_OPTIONS[i].key) == 0) {
+            const char *value = argv[1];
+            size_t value_len = strlen(value) + 1;
 
-    return 0;
+            assert(STRING_OPTIONS[i].validator);
+            if (STRING_OPTIONS[i].validator(shell, value, value_len,
+                                            &STRING_OPTIONS[i])) {
+                return -1;
+            }
+
+            memcpy(STRING_OPTIONS[i].value, value, value_len);
+
+            return 0;
+        }
+    }
+
+    AVS_UNREACHABLE("Invalid option key");
+    return -1;
 }
 
 static int parse_uint32(const char *value, uint32_t *out) {
@@ -393,10 +283,10 @@ uint32_t config_get_gps_nrf_prio_mode_cooldown(void) {
 static int string_validate(const struct shell *shell,
                            const char *value,
                            size_t value_len,
-                           option_id_t option) {
-    if (value_len > STRING_OPTIONS[option].value_capacity) {
+                           const option_t *option) {
+    if (value_len > option->value_capacity) {
         shell_error(shell, "Value too long, maximum length is %d\n",
-                    STRING_OPTIONS[option].value_capacity - 1);
+                    option->value_capacity - 1);
         return -1;
     }
 
@@ -406,7 +296,7 @@ static int string_validate(const struct shell *shell,
 static int flag_validate(const struct shell *shell,
                          const char *value,
                          size_t value_len,
-                         option_id_t option) {
+                         const option_t *option) {
     if (value_len != 2 || (value[0] != 'y' && value[0] != 'n')) {
         shell_error(shell, "Value invalid, 'y' or 'n' is allowed\n");
         return -1;
@@ -418,7 +308,7 @@ static int flag_validate(const struct shell *shell,
 static int uint32_validate(const struct shell *shell,
                            const char *value,
                            size_t value_len,
-                           option_id_t option) {
+                           const option_t *option) {
     if (string_validate(shell, value, value_len, option)) {
         return -1;
     }
