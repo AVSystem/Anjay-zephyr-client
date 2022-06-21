@@ -16,8 +16,8 @@ The following LwM2M Objects are supported:
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Common         | Security (/0)<br>Server (/1)<br>Device (/3)<br>Push button (/3347)                                                                                                          |
 | B-L475E-IOT01A | Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)                      |
-| nRF9160DK      | **Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (3342)                                                                                                               |
-| Thingy:91      | **Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420) |
+| nRF9160DK      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
+| Thingy:91      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
 
 ## Compilation
 

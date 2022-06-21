@@ -16,12 +16,25 @@
 
 #pragma once
 
-#include <anjay/dm.h>
+#include <stdatomic.h>
+#include <stdbool.h>
 
-const anjay_dm_object_def_t **device_object_create(void);
-void device_object_release(const anjay_dm_object_def_t **def);
-void device_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);
+#include <zephyr.h>
+#include <modem/lte_lc.h>
+#include <modem/modem_info.h>
 
-const anjay_dm_object_def_t **pattern_detector_object_create(void);
-void pattern_detector_object_release(const anjay_dm_object_def_t **def);
-void pattern_detector_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);
+/**
+ * Contains last known tracked state from nRF Link Control library.
+ */
+struct nrf_lc_info {
+	enum lte_lc_lte_mode lte_mode;
+	struct lte_lc_cells_info cells;
+	char ip_addr[MODEM_INFO_MAX_RESPONSE_SIZE];
+	struct {
+		struct lte_lc_ncell neighbor_cells[CONFIG_LTE_NEIGHBOR_CELLS_MAX];
+	} storage;
+};
+
+int initialize_nrf_lc_info_listener(void);
+void nrf_lc_info_get(struct nrf_lc_info *out);
+bool nrf_lc_info_get_if_changed(struct nrf_lc_info *out);

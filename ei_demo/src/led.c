@@ -20,44 +20,48 @@
 
 #include "led.h"
 
-void led_init(void) {
-    if (device_is_ready(LED_DEV(0))) {
-        gpio_pin_configure(LED_DEV(0), LED_PIN(0), LED_FLAGS(0));
-    }
-    if (device_is_ready(LED_DEV(1))) {
-        gpio_pin_configure(LED_DEV(1), LED_PIN(1), LED_FLAGS(1));
-    }
-    if (device_is_ready(LED_DEV(2))) {
-        gpio_pin_configure(LED_DEV(2), LED_PIN(2), LED_FLAGS(2));
-    }
+void led_init(void)
+{
+	if (device_is_ready(LED_DEV(0))) {
+		gpio_pin_configure(LED_DEV(0), LED_PIN(0), LED_FLAGS(0));
+	}
+	if (device_is_ready(LED_DEV(1))) {
+		gpio_pin_configure(LED_DEV(1), LED_PIN(1), LED_FLAGS(1));
+	}
+	if (device_is_ready(LED_DEV(2))) {
+		gpio_pin_configure(LED_DEV(2), LED_PIN(2), LED_FLAGS(2));
+	}
 }
 
-static void led_set(int led, bool state) {
-    switch (led) {
-    case 0:
-        if (device_is_ready(LED_DEV(0))) {
-            gpio_pin_set(LED_DEV(0), LED_PIN(0), state);
-        }
-        break;
-    case 1:
-        if (device_is_ready(LED_DEV(1))) {
-            gpio_pin_set(LED_DEV(1), LED_PIN(1), state);
-        }
-        break;
-    case 2:
-        if (device_is_ready(LED_DEV(2))) {
-            gpio_pin_set(LED_DEV(2), LED_PIN(2), state);
-        }
-        break;
-    default:
-        break;
-    }
+static void led_set(int led, bool state)
+{
+	switch (led) {
+	case 0:
+		if (device_is_ready(LED_DEV(0))) {
+			gpio_pin_set(LED_DEV(0), LED_PIN(0), state);
+		}
+		break;
+	case 1:
+		if (device_is_ready(LED_DEV(1))) {
+			gpio_pin_set(LED_DEV(1), LED_PIN(1), state);
+		}
+		break;
+	case 2:
+		if (device_is_ready(LED_DEV(2))) {
+			gpio_pin_set(LED_DEV(2), LED_PIN(2), state);
+		}
+		break;
+	default:
+		break;
+	}
 }
 
-void led_on(int led) {
-    led_set(led, true);
+void led_on(int led)
+{
+	led_set(led, true);
 }
 
-void led_off(int led) {
-    led_set(led, false);
+void led_off(int led)
+{
+	led_set(led, false);
 }

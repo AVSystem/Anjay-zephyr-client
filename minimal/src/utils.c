@@ -22,15 +22,16 @@
 
 #include <avsystem/commons/avs_utils.h>
 
-int get_device_id(device_id_t *out_id) {
-    memset(out_id->value, 0, sizeof(out_id->value));
+int get_device_id(struct device_id *out_id)
+{
+	memset(out_id->value, 0, sizeof(out_id->value));
 
-    uint8_t id[12];
-    ssize_t retval = hwinfo_get_device_id(id, sizeof(id));
-    if (retval <= 0) {
-        return -1;
-    }
+	uint8_t id[12];
+	ssize_t retval = hwinfo_get_device_id(id, sizeof(id));
 
-    return avs_hexlify(out_id->value, sizeof(out_id->value), NULL, id,
-                       (size_t) retval);
+	if (retval <= 0) {
+		return -1;
+	}
+
+	return avs_hexlify(out_id->value, sizeof(out_id->value), NULL, id, (size_t)retval);
 }

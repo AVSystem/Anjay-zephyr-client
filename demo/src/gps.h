@@ -16,32 +16,37 @@
 
 #pragma once
 
-#include <kernel.h>
+#include <zephyr.h>
 #include <stdbool.h>
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS
-typedef struct gps_data_struct {
-    bool valid;
-    int64_t timestamp;
-    double latitude;
-    double longitude;
-#    ifdef CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
-    double altitude;
-#    endif // CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
-#    ifdef CONFIG_ANJAY_CLIENT_GPS_RADIUS
-    double radius;
-#    endif // CONFIG_ANJAY_CLIENT_GPS_RADIUS
-#    ifdef CONFIG_ANJAY_CLIENT_GPS_VELOCITY
+struct gps_data {
+	bool valid;
+	int64_t timestamp;
+	double latitude;
+	double longitude;
+#ifdef CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
+	double altitude;
+#endif // CONFIG_ANJAY_CLIENT_GPS_ALTITUDE
+#ifdef CONFIG_ANJAY_CLIENT_GPS_RADIUS
+	double radius;
+#endif // CONFIG_ANJAY_CLIENT_GPS_RADIUS
+#ifdef CONFIG_ANJAY_CLIENT_GPS_VELOCITY
 // TODO: implement velocity binary format as in 3GPP-TS_23.032
-#        error "velocity binary format not implemented yet"
-#    endif // CONFIG_ANJAY_CLIENT_GPS_VELOCITY
-#    ifdef CONFIG_ANJAY_CLIENT_GPS_SPEED
-    double speed;
-#    endif // CONFIG_ANJAY_CLIENT_GPS_SPEED
-} gps_data_t;
+#error "velocity binary format not implemented yet"
+#endif // CONFIG_ANJAY_CLIENT_GPS_VELOCITY
+#ifdef CONFIG_ANJAY_CLIENT_GPS_SPEED
+	double speed;
+#endif // CONFIG_ANJAY_CLIENT_GPS_SPEED
+};
 
-extern struct k_mutex GPS_READ_LAST_MTX;
-extern gps_data_t GPS_READ_LAST;
+extern struct k_mutex gps_read_last_mtx;
+extern struct gps_data gps_read_last;
 
 int initialize_gps(void);
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+uint32_t gps_fetch_modem_agps_request_mask(void);
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+
 #endif // CONFIG_ANJAY_CLIENT_GPS

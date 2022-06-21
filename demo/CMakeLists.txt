@@ -19,30 +19,45 @@ project(anjay_zephyr_demo)
 set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
 
 set(app_common_sources
-    src/main.c
     src/anjay_shell.c
-    src/status_led.c
-    src/status_led.h
     src/common.h
     src/config.c
     src/config.h
+    src/default_config.h
+    src/firmware_update.h
+    src/gps.h
+    src/main.c
+    src/persistence.h
+    src/status_led.c
+    src/status_led.h
     src/utils.c
     src/utils.h
-    src/gps.h
-    src/default_config.h
-    src/objects/objects.h
+    src/objects/basic_sensors.c
+    src/objects/buzzer.c
     src/objects/device.c
+    src/objects/led_color_light.c
     src/objects/location.c
+    src/objects/objects.h
     src/objects/push_button.c
     src/objects/switch.c
-    src/objects/basic_sensors.c
-    src/objects/three_axis_sensors.c
-    src/objects/buzzer.c
-    src/objects/led_color_light.c)
+    src/objects/three_axis_sensors.c)
 
 if(CONFIG_ANJAY_CLIENT_GPS_NRF)
     list(APPEND app_common_sources
          src/gps_impl/gps_nrf.c)
+endif()
+
+if(CONFIG_ANJAY_CLIENT_NRF_LC_INFO)
+    list(APPEND app_common_sources
+         src/nrf_lc_info.c
+         src/nrf_lc_info.h
+         src/objects/conn_mon.c
+         src/objects/ecid.c)
+endif()
+
+if(CONFIG_ANJAY_CLIENT_LOCATION_SERVICES)
+    list(APPEND app_common_sources
+         src/objects/loc_assist.c)
 endif()
 
 if(CONFIG_ANJAY_CLIENT_FOTA)
@@ -63,6 +78,11 @@ if(CONFIG_ANJAY_CLIENT_FOTA)
 
     list(APPEND app_common_sources
          src/firmware_update.c)
+endif()
+
+if(CONFIG_ANJAY_CLIENT_PERSISTENCE)
+    list(APPEND app_common_sources
+         src/persistence.c)
 endif()
 
 target_sources(app PRIVATE

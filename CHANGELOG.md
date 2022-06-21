@@ -1,5 +1,17 @@
 # Changelog
 
+## 22.06 (Jun 21st, 2022)
+
+- Updated Anjay-zephyr to 3.0.0
+- Reformatted code so it meets Zephyr standards
+
+### Added
+
+- Implemented Location Assistance object
+- Implemented Connectivity Monitoring object
+- Added shell command to enable runtime lifetime reconfiguration
+- Added persistence implementation
+
 ## 22.03 (Mar 24th, 2022)
 
 - Updated Anjay-zephyr to 2.14.1

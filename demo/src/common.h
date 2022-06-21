@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANJAY_ZEPHYR_COMMON
-
-#define ANJAY_ZEPHYR_COMMON
+#pragma once
 
 #include <kernel.h>
 #include <shell/shell.h>
@@ -26,17 +24,25 @@
 
 #include <anjay/anjay.h>
 
-extern volatile atomic_bool DEVICE_INITIALIZED;
+#include "objects/objects.h"
 
-extern anjay_t *volatile ANJAY;
-extern struct k_mutex ANJAY_MUTEX;
-extern volatile atomic_bool ANJAY_RUNNING;
+extern volatile atomic_bool device_initialized;
+
+extern anjay_t *volatile global_anjay;
+extern struct k_mutex global_anjay_mutex;
+extern volatile atomic_bool anjay_running;
 
 #define ANJAY_THREAD_PRIO 1
 #define ANJAY_THREAD_STACK_SIZE 4096
-extern struct k_thread ANJAY_THREAD;
-extern volatile bool ANJAY_THREAD_RUNNING;
-extern struct k_mutex ANJAY_THREAD_RUNNING_MUTEX;
-extern struct k_condvar ANJAY_THREAD_RUNNING_CONDVAR;
+extern struct k_thread anjay_thread;
+extern volatile bool anjay_thread_running;
+extern struct k_mutex anjay_thread_running_mutex;
+extern struct k_condvar anjay_thread_running_condvar;
 
-#endif // ANJAY_ZEPHYR_COMMON
+#ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+struct cell_request_job_args {
+	anjay_t *anjay;
+	enum loc_assist_cell_request_type request_type;
+};
+avs_sched_clb_t cell_request_job;
+#endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED

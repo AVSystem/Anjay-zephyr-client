@@ -16,9 +16,9 @@
 
 #pragma once
 
-typedef struct {
-    // 96 bits as hex + NULL-byte
-    char value[25];
-} device_id_t;
+struct device_id {
+	// 96 bits as hex + NULL-byte
+	char value[25];
+};
 
-int get_device_id(device_id_t *out_id);
+int get_device_id(struct device_id *out_id);

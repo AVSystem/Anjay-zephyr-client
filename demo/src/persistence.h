@@ -16,12 +16,11 @@
 
 #pragma once
 
-#include <anjay/dm.h>
+#include <anjay/core.h>
 
-const anjay_dm_object_def_t **device_object_create(void);
-void device_object_release(const anjay_dm_object_def_t **def);
-void device_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);
-
-const anjay_dm_object_def_t **pattern_detector_object_create(void);
-void pattern_detector_object_release(const anjay_dm_object_def_t **def);
-void pattern_detector_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+int persistence_init(void);
+int persistence_purge(void);
+int restore_anjay_from_persistence(anjay_t *anjay);
+int persist_anjay_if_required(anjay_t *anjay);
+#endif

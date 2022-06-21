@@ -21,17 +21,21 @@
 #include <shell/shell.h>
 
 #ifdef CONFIG_WIFI
-#    define OPTION_KEY_SSID wifi_ssid
-#    define OPTION_KEY_PASSWORD wifi_password
+#define OPTION_KEY_SSID wifi_ssid
+#define OPTION_KEY_PASSWORD wifi_password
 #endif // CONFIG_WIFI
 #define OPTION_KEY_URI uri
 #define OPTION_KEY_EP_NAME endpoint
+#define OPTION_KEY_LIFETIME lifetime
 #define OPTION_KEY_PSK psk
 #define OPTION_KEY_BOOTSTRAP bootstrap
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
-#    define OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT gps_prio_mode_timeout
-#    define OPTION_KEY_GPS_NRF_PRIO_MODE_COOLDOWN gps_prio_mode_cooldown
+#define OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT gps_prio_mode_timeout
+#define OPTION_KEY_GPS_NRF_PRIO_MODE_COOLDOWN gps_prio_mode_cooldown
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#define OPTION_KEY_USE_PERSISTENCE use_persistence
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
 void config_init(const struct shell *shell);
 void config_save(const struct shell *shell);
@@ -52,6 +56,8 @@ const char *config_get_wifi_password(void);
 
 const char *config_get_server_uri(void);
 
+uint32_t config_get_lifetime(void);
+
 const char *config_get_psk(void);
 
 bool config_is_bootstrap(void);
@@ -61,3 +67,7 @@ uint32_t config_get_gps_nrf_prio_mode_timeout(void);
 
 uint32_t config_get_gps_nrf_prio_mode_cooldown(void);
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+bool config_is_use_persistence(void);
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE

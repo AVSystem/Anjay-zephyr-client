@@ -1,45 +1,45 @@
 menu "anjay-zephyr-client"
 
 config ANJAY_CLIENT_DEVICE_MANUFACTURER
-    string "Device manufacturer"
-    default "Unknown"
+	string "Device manufacturer"
+	default "Unknown"
 
 config ANJAY_CLIENT_MODEL_NUMBER
-    string "Model number"
-    default "Unknown"
+	string "Model number"
+	default "Unknown"
 
 config ANJAY_CLIENT_ENDPOINT_NAME
-    string "Endpoint Name"
-    default "Anjay-zephyr-client"
+	string "Endpoint Name"
+	default "Anjay-zephyr-client"
 
 config ANJAY_CLIENT_VERSION
-    string "Client Version"
-    default "22.03"
+	string "Client Version"
+	default "22.06"
 
 config ANJAY_CLIENT_SERVER_URI
-    string "Server URI"
-    default "coaps://try-anjay.avsystem.com:5684"
+	string "Server URI"
+	default "coaps://try-anjay.avsystem.com:5684"
 
 config ANJAY_CLIENT_PSK_IDENTITY
-    string "PSK Identity"
-    default ANJAY_CLIENT_ENDPOINT_NAME
+	string "PSK Identity"
+	default ANJAY_CLIENT_ENDPOINT_NAME
 
 config ANJAY_CLIENT_PSK_KEY
-    string "PSK Key"
-    default "test"
+	string "PSK Key"
+	default "test"
 
 config ANJAY_CLIENT_NTP_SERVER
-    string "NTP Server"
-    default "time.nist.gov"
+	string "NTP Server"
+	default "time.nist.gov"
 
 if WIFI
-    config ANJAY_CLIENT_WIFI_SSID
-        string "Wifi SSID"
-        default "ssid"
+	config ANJAY_CLIENT_WIFI_SSID
+	    string "Wifi SSID"
+	    default "ssid"
 
-    config ANJAY_CLIENT_WIFI_PASSWORD
-        string "Wifi password"
-        default "password"
+	config ANJAY_CLIENT_WIFI_PASSWORD
+	    string "Wifi password"
+	    default "password"
 endif
 endmenu
 

@@ -1,63 +1,105 @@
 menu "anjay-zephyr-client"
 
 config ANJAY_CLIENT_DEVICE_MANUFACTURER
-    string "Device manufacturer"
-    default "Unknown"
+	string "Device manufacturer"
+	default "Unknown"
 
 config ANJAY_CLIENT_MODEL_NUMBER
-    string "Model number"
-    default "Unknown"
+	string "Model number"
+	default "Unknown"
 
-config ANJAY_CLIENT_GPS_NRF
-    bool "Enable GPS on nRF9160-based devices"
-    default n
-    depends on BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS
-    select AT_CMD
-    help
-      Enable GPS on nRF9160-based devices and Location Object implementation.
-
-      Please note, that nRF9160 is not able to acquire the cold GPS fix if
-      the chip is interrupted by any LTE activity. The application might
-      temporarily enable GPS priority mode, which shuts down LTE completely and
-      attempts to acquire the fix. This behavior is controlled by
-      gps_prio_mode_timeout and gps_prio_mode_cooldown variables which are
-      configurable in the runtime. Setting gps_prio_mode_timeout to 0 will
-      disable the GPS priority mode completely.
-
-config ANJAY_CLIENT_EXTERNAL_GPS_ANTENNA
-    bool "Use external GPS antenna"
-    default n
-    depends on ANJAY_CLIENT_GPS_NRF
-    depends on BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS
+config ANJAY_CLIENT_LOCATION_OBJECT
+	def_bool ANJAY_CLIENT_GPS
 
 config ANJAY_CLIENT_GPS
-    bool
-    default y
-    depends on ANJAY_CLIENT_GPS_NRF
+	def_bool ANJAY_CLIENT_GPS_NRF
 
 config ANJAY_CLIENT_GPS_ALTITUDE
-    bool
-    default y
-    depends on ANJAY_CLIENT_GPS_NRF
+	def_bool ANJAY_CLIENT_GPS_NRF
 
 config ANJAY_CLIENT_GPS_RADIUS
-    bool
-    default y
-    depends on ANJAY_CLIENT_GPS_NRF
+	def_bool ANJAY_CLIENT_GPS_NRF
 
 config ANJAY_CLIENT_GPS_VELOCITY
-    bool
-    default n
+	def_bool n
 
 config ANJAY_CLIENT_GPS_SPEED
-    bool
-    default y
-    depends on ANJAY_CLIENT_GPS_NRF
+	def_bool ANJAY_CLIENT_GPS_NRF
+
+config ANJAY_CLIENT_LOCATION_SERVICES
+	def_bool ANJAY_CLIENT_LOCATION_SERVICES_ASSISTANCE || ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+	select ANJAY_WITH_LWM2M11
+	select ANJAY_WITH_SEND
+	select ANJAY_WITH_SENML_JSON
+
+config ANJAY_CLIENT_LOCATION_SERVICES_ASSISTANCE
+	def_bool ANJAY_CLIENT_GPS_NRF_A_GPS || ANJAY_CLIENT_GPS_NRF_P_GPS
+
+menuconfig ANJAY_CLIENT_GPS_NRF
+	bool "Enable GPS on nRF9160-based devices"
+	default n
+	depends on BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS
+	select AT_CMD
+	help
+		Enable GPS on nRF9160-based devices and Location Object implementation.
+
+		Please note, that nRF9160 is not able to acquire the cold GPS fix if
+		the chip is interrupted by any LTE activity. The application might
+		temporarily enable GPS priority mode, which shuts down LTE completely and
+		attempts to acquire the fix. This behavior is controlled by
+		gps_prio_mode_timeout and gps_prio_mode_cooldown variables which are
+		configurable in the runtime. Setting gps_prio_mode_timeout to 0 will
+		disable the GPS priority mode completely.
+
+	config ANJAY_CLIENT_GPS_NRF_EXTERNAL_ANTENNA
+		bool "Use external GPS antenna"
+		depends on ANJAY_CLIENT_GPS_NRF
+
+	config ANJAY_CLIENT_GPS_NRF_A_GPS
+		bool "Enable A-GPS using Nordic Location Services over LwM2M"
+		depends on ANJAY_CLIENT_GPS_NRF
+		select NRF_CLOUD_AGPS
+		help
+			Attempt to retrieve A-GPS data using Nordic Location Services over LwM2M.
+
+			This is a experimental feature under active development, which is currently
+			available only on selected instances of AVSystem's Coiote IoT DM servers.
+
+config ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+	bool "Enable manual requests for cell-based location"
+	depends on ANJAY_CLIENT_NRF_LC_INFO
+	help
+		Enable "anjay nls_cell_request" command for retrieving cell-based location using
+		Nordic Location Services over LwM2M.
+
+		This is a experimental feature under active development, which is currently
+		available only on selected instances of AVSystem's Coiote IoT DM servers.
+
+config ANJAY_CLIENT_NRF_LC_INFO
+	def_bool LTE_LINK_CONTROL && (BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS)
+	help
+		Enables handlers tracking nRF9160 Link Control library state and Connectivity
+		Monitor, ECID objects utilizing data from LC library.
+
+config ANJAY_CLIENT_NRF_LC_INFO_CELL_POLL_RATE
+	int "Current and neighbouring cells stats polling rate [seconds]"
+	default 30
+	range 1 2147483647
+	depends on ANJAY_CLIENT_NRF_LC_INFO
 
 config ANJAY_CLIENT_FOTA
-    bool
-    default y
-    depends on BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS
+	def_bool BOARD_THINGY91_NRF9160_NS || BOARD_NRF9160DK_NRF9160_NS
+
+config ANJAY_CLIENT_PERSISTENCE
+	bool "Enable persistence"
+	# FIXME: This shouldn't be required, but currently using LwM2M 1.0
+	# with structured credentials bug in Anjay causes some hardfaults to pop up
+	select ANJAY_WITH_LWM2M11
+	select ANJAY_WITH_ACCESS_CONTROL
+	select ANJAY_WITH_MODULE_ACCESS_CONTROL
+	help
+		Enables persistence of Access Control Object, Attribute Storage, Security Object
+		and Server Object.
 
 endmenu
 

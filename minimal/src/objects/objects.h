@@ -20,5 +20,4 @@
 
 const anjay_dm_object_def_t **device_object_create(void);
 void device_object_release(const anjay_dm_object_def_t **def);
-void device_object_update(anjay_t *anjay,
-                          const anjay_dm_object_def_t *const *def);
+void device_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);

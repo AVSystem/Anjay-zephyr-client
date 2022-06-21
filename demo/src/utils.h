@@ -19,25 +19,25 @@
 #include <stddef.h>
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
-#    include <dfu/mcuboot.h>
+#include <dfu/mcuboot.h>
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
-typedef struct {
-    // 96 bits as hex + NULL-byte
-    char value[25];
-} device_id_t;
+struct device_id {
+	// 96 bits as hex + NULL-byte
+	char value[25];
+};
 
-int get_device_id(device_id_t *out_id);
+int get_device_id(struct device_id *out_id);
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
 int get_fw_version_image_0(char *out_buf, size_t buf_size);
 int get_fw_version_image_1(char *out_buf, size_t buf_size);
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
-#define SYNCHRONIZED(Mtx)                                          \
-    for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); \
-         !_synchronized_exit; _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))
+#define SYNCHRONIZED(Mtx)                                                                          \
+	for (int _synchronized_exit = k_mutex_lock(&(Mtx), K_FOREVER); !_synchronized_exit;        \
+	     _synchronized_exit = -1, k_mutex_unlock(&(Mtx)))
 
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
-int tls_session_cache_purge();
+int tls_session_cache_purge(void);
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)

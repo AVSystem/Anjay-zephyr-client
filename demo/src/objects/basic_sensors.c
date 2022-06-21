@@ -24,117 +24,102 @@
 
 #include "objects.h"
 
-typedef struct {
-    const char *name;
-    const char *unit;
-    anjay_oid_t oid;
-    const struct device *device;
-    enum sensor_channel channel;
-    double scale_factor;
-} sensor_context_t;
+struct sensor_context {
+	const char *name;
+	const char *unit;
+	anjay_oid_t oid;
+	const struct device *device;
+	enum sensor_channel channel;
+	double scale_factor;
+};
 
 #define KPA_TO_PA_FACTOR 1e3
 
-static sensor_context_t BASIC_SENSORS_DEF[] = {
+static struct sensor_context basic_sensors_def[] = {
 #if TEMPERATURE_AVAILABLE
-    {
-        .name = "Temperature",
-        .unit = "Cel",
-        .oid = 3303,
-        .device = DEVICE_DT_GET(TEMPERATURE_NODE),
-        .channel = SENSOR_CHAN_AMBIENT_TEMP,
-    },
+	{ .name = "Temperature",
+	  .unit = "Cel",
+	  .oid = 3303,
+	  .device = DEVICE_DT_GET(TEMPERATURE_NODE),
+	  .channel = SENSOR_CHAN_AMBIENT_TEMP },
 #endif // TEMPERATURE_AVAILABLE
 #if HUMIDITY_AVAILABLE
-    {
-        .name = "Humidity",
-        .unit = "%RH",
-        .oid = 3304,
-        .device = DEVICE_DT_GET(HUMIDITY_NODE),
-        .channel = SENSOR_CHAN_HUMIDITY
-    },
+	{ .name = "Humidity",
+	  .unit = "%RH",
+	  .oid = 3304,
+	  .device = DEVICE_DT_GET(HUMIDITY_NODE),
+	  .channel = SENSOR_CHAN_HUMIDITY },
 #endif // HUMIDITY_AVAILABLE
 #if BAROMETER_AVAILABLE
-    {
-        .name = "Barometer",
-        .unit = "Pa",
-        .oid = 3315,
-        .device = DEVICE_DT_GET(BAROMETER_NODE),
-        .channel = SENSOR_CHAN_PRESS,
-        .scale_factor = KPA_TO_PA_FACTOR
-    },
+	{ .name = "Barometer",
+	  .unit = "Pa",
+	  .oid = 3315,
+	  .device = DEVICE_DT_GET(BAROMETER_NODE),
+	  .channel = SENSOR_CHAN_PRESS,
+	  .scale_factor = KPA_TO_PA_FACTOR },
 #endif // BAROMETER_AVAILABLE
 #if DISTANCE_AVAILABLE
-    {
-        .name = "Distance",
-        .unit = "m",
-        .oid = 3330,
-        .device = DEVICE_DT_GET(DISTANCE_NODE),
-        .channel = SENSOR_CHAN_DISTANCE
-    },
+	{ .name = "Distance",
+	  .unit = "m",
+	  .oid = 3330,
+	  .device = DEVICE_DT_GET(DISTANCE_NODE),
+	  .channel = SENSOR_CHAN_DISTANCE },
 #endif // DISTANCE_AVAILABLE
 };
 
-int basic_sensor_get_value(anjay_iid_t iid, void *_ctx, double *value) {
-    sensor_context_t *ctx = (sensor_context_t *) _ctx;
+int basic_sensor_get_value(anjay_iid_t iid, void *_ctx, double *value)
+{
+	struct sensor_context *ctx = (struct sensor_context *)_ctx;
 
-    struct sensor_value tmp_value;
-    if (sensor_sample_fetch_chan(ctx->device, ctx->channel)
-            || sensor_channel_get(ctx->device, ctx->channel, &tmp_value)) {
-        avs_log(sensor, ERROR, "Failed to read from %s", ctx->device->name);
-        return -1;
-    }
+	struct sensor_value tmp_value;
 
-    *value = (float) sensor_value_to_double(&tmp_value);
+	if (sensor_sample_fetch_chan(ctx->device, ctx->channel) ||
+	    sensor_channel_get(ctx->device, ctx->channel, &tmp_value)) {
+		avs_log(sensor, ERROR, "Failed to read from %s", ctx->device->name);
+		return -1;
+	}
 
-    if (ctx->scale_factor) {
-        *value = (*value) * ctx->scale_factor;
-    }
+	*value = (float)sensor_value_to_double(&tmp_value);
 
-    return 0;
+	if (ctx->scale_factor) {
+		*value = (*value) * ctx->scale_factor;
+	}
+
+	return 0;
 }
 
-void basic_sensors_install(anjay_t *anjay) {
-    for (int i = 0; i < AVS_ARRAY_SIZE(BASIC_SENSORS_DEF); i++) {
-        sensor_context_t *ctx = &BASIC_SENSORS_DEF[i];
+void basic_sensors_install(anjay_t *anjay)
+{
+	for (int i = 0; i < AVS_ARRAY_SIZE(basic_sensors_def); i++) {
+		struct sensor_context *ctx = &basic_sensors_def[i];
 
-        if (!device_is_ready(ctx->device)) {
-            avs_log(ipso_object,
-                    WARNING,
-                    "Object: %s could not be installed",
-                    ctx->name);
-            continue;
-        }
+		if (!device_is_ready(ctx->device)) {
+			avs_log(ipso_object, WARNING, "Object: %s could not be installed",
+				ctx->name);
+			continue;
+		}
 
-        if (anjay_ipso_basic_sensor_install(anjay, ctx->oid, 1)) {
-            avs_log(ipso_object,
-                    WARNING,
-                    "Object: %s could not be installed",
-                    ctx->name);
-            continue;
-        }
+		if (anjay_ipso_basic_sensor_install(anjay, ctx->oid, 1)) {
+			avs_log(ipso_object, WARNING, "Object: %s could not be installed",
+				ctx->name);
+			continue;
+		}
 
-        if (anjay_ipso_basic_sensor_instance_add(
-                    anjay,
-                    ctx->oid,
-                    0,
-                    (anjay_ipso_basic_sensor_impl_t) {
-                        .unit = ctx->unit,
-                        .user_context = ctx,
-                        .min_range_value = NAN,
-                        .max_range_value = NAN,
-                        .get_value = basic_sensor_get_value
-                    })) {
-            avs_log(ipso_object,
-                    WARNING,
-                    "Instance of %s object could not be added",
-                    ctx->name);
-        }
-    }
+		anjay_ipso_basic_sensor_impl_t impl = { .unit = ctx->unit,
+							.user_context = ctx,
+							.min_range_value = NAN,
+							.max_range_value = NAN,
+							.get_value = basic_sensor_get_value };
+		if (anjay_ipso_basic_sensor_instance_add(anjay, ctx->oid, 0, impl)) {
+			avs_log(ipso_object, WARNING, "Instance of %s object could not be added",
+				ctx->name);
+		}
+	}
 }
 
-void basic_sensors_update(anjay_t *anjay) {
-    for (int i = 0; i < AVS_ARRAY_SIZE(BASIC_SENSORS_DEF); i++) {
-        anjay_ipso_basic_sensor_update(anjay, BASIC_SENSORS_DEF[i].oid, 0);
-    }
+void basic_sensors_update(anjay_t *anjay)
+{
+	for (int i = 0; i < AVS_ARRAY_SIZE(basic_sensors_def); i++) {
+		anjay_ipso_basic_sensor_update(anjay, basic_sensors_def[i].oid, 0);
+	}
 }

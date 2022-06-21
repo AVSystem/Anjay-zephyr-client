@@ -16,29 +16,34 @@
 
 #pragma once
 
-#include <autoconf.h>
 #include <avsystem/commons/avs_log.h>
 
-#define CLIENT_VERSION "22.03"
+#define CLIENT_VERSION "22.06"
 
 #define DEFAULT_LOG_LEVEL AVS_LOG_INFO
 
 #ifdef CONFIG_WIFI
-#    define WIFI_SSID "ssid"
+#define WIFI_SSID "ssid"
 
-#    define WIFI_PASSWORD "password"
+#define WIFI_PASSWORD "password"
 #endif // CONFIG_WIFI
 
 #define SERVER_URI "coaps://try-anjay.avsystem.com:5684"
+
+#define LIFETIME "50"
 
 #define PSK_KEY "psk"
 
 #define BOOTSTRAP "n"
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
-#    define GPS_NRF_PRIO_MODE_TIMEOUT "300"
+#define GPS_NRF_PRIO_MODE_TIMEOUT "300"
 
-#    define GPS_NRF_PRIO_MODE_COOLDOWN "1800"
+#define GPS_NRF_PRIO_MODE_COOLDOWN "1800"
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
+
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#define USE_PERSISTENCE "n"
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
 #define NTP_SERVER "time.nist.gov"

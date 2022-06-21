@@ -22,48 +22,58 @@
 #include <avsystem/commons/avs_log.h>
 
 #if STATUS_LED_AVAILABLE
-#    define STATUS_LED_GPIO_PORT DT_GPIO_CTLR(STATUS_LED_NODE, gpios)
-#    define STATUS_LED_GPIO_PIN DT_GPIO_PIN(STATUS_LED_NODE, gpios)
-#    define STATUS_LED_GPIO_FLAGS \
-        (GPIO_OUTPUT_INACTIVE | DT_GPIO_FLAGS(STATUS_LED_NODE, gpios))
+#define STATUS_LED_GPIO_PORT DT_GPIO_CTLR(STATUS_LED_NODE, gpios)
+#define STATUS_LED_GPIO_PIN DT_GPIO_PIN(STATUS_LED_NODE, gpios)
+#define STATUS_LED_GPIO_FLAGS (GPIO_OUTPUT_INACTIVE | DT_GPIO_FLAGS(STATUS_LED_NODE, gpios))
 
-static const struct device *STATUS_LED_DEVICE =
-        DEVICE_DT_GET(STATUS_LED_GPIO_PORT);
+static const struct device *status_led_device = DEVICE_DT_GET(STATUS_LED_GPIO_PORT);
 
-void status_led_init(void) {
-    if (!device_is_ready(STATUS_LED_DEVICE)
-            || gpio_pin_configure(STATUS_LED_DEVICE, STATUS_LED_GPIO_PIN,
-                                  STATUS_LED_GPIO_FLAGS)) {
-        STATUS_LED_DEVICE = NULL;
-        avs_log(status_led, WARNING, "failed to initialize status led");
-    }
+void status_led_init(void)
+{
+	if (!device_is_ready(status_led_device) ||
+	    gpio_pin_configure(status_led_device, STATUS_LED_GPIO_PIN, STATUS_LED_GPIO_FLAGS)) {
+		status_led_device = NULL;
+		avs_log(status_led, WARNING, "failed to initialize status led");
+	}
 }
 
-static void status_led_set(int value) {
-    if (STATUS_LED_DEVICE) {
-        gpio_pin_set(STATUS_LED_DEVICE, STATUS_LED_GPIO_PIN, value);
-    }
+static void status_led_set(int value)
+{
+	if (status_led_device) {
+		gpio_pin_set(status_led_device, STATUS_LED_GPIO_PIN, value);
+	}
 }
 
-void status_led_on(void) {
-    status_led_set(1);
+void status_led_on(void)
+{
+	status_led_set(1);
 }
 
-void status_led_off(void) {
-    status_led_set(0);
+void status_led_off(void)
+{
+	status_led_set(0);
 }
 
-void status_led_toggle(void) {
-    if (STATUS_LED_DEVICE) {
-        gpio_pin_toggle(STATUS_LED_DEVICE, STATUS_LED_GPIO_PIN);
-    }
+void status_led_toggle(void)
+{
+	if (status_led_device) {
+		gpio_pin_toggle(status_led_device, STATUS_LED_GPIO_PIN);
+	}
 }
-#else  // STATUS_LED_AVAILABLE
-void status_led_init(void) {}
+#else // STATUS_LED_AVAILABLE
+void status_led_init(void)
+{
+}
 
-void status_led_on(void) {}
+void status_led_on(void)
+{
+}
 
-void status_led_off(void) {}
+void status_led_off(void)
+{
+}
 
-void status_led_toggle(void) {}
+void status_led_toggle(void)
+{
+}
 #endif // STATUS_LED_AVAILABLE
