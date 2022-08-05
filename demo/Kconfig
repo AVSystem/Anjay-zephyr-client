@@ -62,7 +62,7 @@ menuconfig ANJAY_CLIENT_GPS_NRF
 		help
 			Attempt to retrieve A-GPS data using Nordic Location Services over LwM2M.
 
-			This is a experimental feature under active development, which is currently
+			This is an experimental feature under active development, which is currently
 			available only on selected instances of AVSystem's Coiote IoT DM servers.
 
 config ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
@@ -72,7 +72,7 @@ config ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 		Enable "anjay nls_cell_request" command for retrieving cell-based location using
 		Nordic Location Services over LwM2M.
 
-		This is a experimental feature under active development, which is currently
+		This is an experimental feature under active development, which is currently
 		available only on selected instances of AVSystem's Coiote IoT DM servers.
 
 config ANJAY_CLIENT_NRF_LC_INFO
@@ -92,14 +92,38 @@ config ANJAY_CLIENT_FOTA
 
 config ANJAY_CLIENT_PERSISTENCE
 	bool "Enable persistence"
-	# FIXME: This shouldn't be required, but currently using LwM2M 1.0
-	# with structured credentials bug in Anjay causes some hardfaults to pop up
-	select ANJAY_WITH_LWM2M11
 	select ANJAY_WITH_ACCESS_CONTROL
 	select ANJAY_WITH_MODULE_ACCESS_CONTROL
 	help
 		Enables persistence of Access Control Object, Attribute Storage, Security Object
 		and Server Object.
+
+config ANJAY_CLIENT_FACTORY_PROVISIONING
+	bool "Use factory provisioning"
+	depends on ANJAY_CLIENT_PERSISTENCE
+	help
+		Use the Factory Provisioning process to configure the client instead of CLI.
+
+		This option causes the client to load the provisioned settings at boot and disables
+		the shell commands that would allow modifying them.
+
+		To provision the settings for use with this configuration, please flash a firmware
+		compiled with (TBD) enabled first.
+
+config ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH
+	bool "Build the app in initial flashing mode"
+	depends on ANJAY_CLIENT_FACTORY_PROVISIONING
+	select ANJAY_WITH_CBOR
+	select ANJAY_WITH_MODULE_FACTORY_PROVISIONING
+	select FILE_SYSTEM
+	select MCUMGR
+	select MCUMGR_CMD_FS_MGMT
+	select MCUMGR_SMP_SHELL
+	select UART_CONSOLE_MCUMGR
+	help
+		An application built in this mode will not perform any normal LwM2M client
+		operation, but instead it will allow to perform the initial flashing of the factory
+		provisioning data.
 
 endmenu
 

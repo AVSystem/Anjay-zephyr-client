@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 
-#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_time.h>
 #include <avsystem/commons/avs_utils.h>
 
@@ -40,6 +39,21 @@
 
 #define EP_NAME_PREFIX "anjay-zephyr-demo"
 
+const char *config_default_ep_name(void)
+{
+	struct device_id id;
+	static char ep_name[sizeof(id.value) + sizeof(EP_NAME_PREFIX) - sizeof('\0') + sizeof('-')];
+
+	if (!get_device_id(&id)) {
+		(void)avs_simple_snprintf(ep_name, sizeof(ep_name), EP_NAME_PREFIX "-%s", id.value);
+	} else {
+		memcpy(ep_name, EP_NAME_PREFIX, sizeof(EP_NAME_PREFIX));
+	}
+
+	return ep_name;
+}
+
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 struct anjay_client_option;
 
 typedef int config_option_validate_t(const struct shell *shell, const char *value, size_t value_len,
@@ -50,18 +64,22 @@ struct anjay_client_app_config {
 	char ssid[32];
 	char password[32];
 #endif // CONFIG_WIFI
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	char uri[128];
 	char lifetime[AVS_UINT_STR_BUF_SIZE(uint32_t)];
 	char ep_name[64];
 	char psk[32];
 	char bootstrap[2];
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
 	char gps_nrf_prio_mode_timeout[AVS_UINT_STR_BUF_SIZE(uint32_t)];
 	char gps_nrf_prio_mode_cooldown[AVS_UINT_STR_BUF_SIZE(uint32_t)];
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#if defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) && !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 	char use_persistence[2];
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+#endif /* defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) &&
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 };
 
 static struct anjay_client_app_config app_config;
@@ -74,9 +92,15 @@ struct anjay_client_option {
 	config_option_validate_t *validator;
 };
 
+#if defined(CONFIG_WIFI) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 static config_option_validate_t string_validate;
+#endif // defined(CONFIG_WIFI) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 static config_option_validate_t flag_validate;
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+#if defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 static config_option_validate_t uint32_validate;
+#endif // defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 
 static struct anjay_client_option string_options[] = {
 #ifdef CONFIG_WIFI
@@ -85,6 +109,7 @@ static struct anjay_client_option string_options[] = {
 	{ AVS_QUOTE_MACRO(OPTION_KEY_PASSWORD), "Wi-Fi password", app_config.password,
 	  sizeof(app_config.password), string_validate },
 #endif // CONFIG_WIFI
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	{ AVS_QUOTE_MACRO(OPTION_KEY_URI), "LwM2M Server URI", app_config.uri,
 	  sizeof(app_config.uri), string_validate },
 	{ AVS_QUOTE_MACRO(OPTION_KEY_LIFETIME), "Device lifetime", app_config.lifetime,
@@ -95,6 +120,7 @@ static struct anjay_client_option string_options[] = {
 	  string_validate },
 	{ AVS_QUOTE_MACRO(OPTION_KEY_BOOTSTRAP), "Bootstrap", app_config.bootstrap,
 	  sizeof(app_config.bootstrap), flag_validate },
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
 	{ AVS_QUOTE_MACRO(OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT), "GPS priority mode timeout",
 	  app_config.gps_nrf_prio_mode_timeout, sizeof(app_config.gps_nrf_prio_mode_timeout),
@@ -103,10 +129,12 @@ static struct anjay_client_option string_options[] = {
 	  app_config.gps_nrf_prio_mode_cooldown, sizeof(app_config.gps_nrf_prio_mode_cooldown),
 	  uint32_validate },
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#if defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) && !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 	{ AVS_QUOTE_MACRO(OPTION_KEY_USE_PERSISTENCE), "Use persistence",
 	  app_config.use_persistence, sizeof(app_config.use_persistence), flag_validate },
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+#endif /* defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) &&
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 };
 
 static int settings_set(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
@@ -161,40 +189,38 @@ void config_save(const struct shell *shell)
 				settings_delete(key_buf);
 			}
 		}
+	} else {
+		shell_print(shell, "Configuration successfully saved");
 	}
 }
 
 void config_default_init(void)
 {
-	app_config = (struct anjay_client_app_config){
+	app_config = (struct anjay_client_app_config)
+	{
 #ifdef CONFIG_WIFI
-		.ssid = WIFI_SSID,
-		.password = WIFI_PASSWORD,
+		.ssid = WIFI_SSID, .password = WIFI_PASSWORD,
 #endif // CONFIG_WIFI
-		.uri = SERVER_URI,
-		.lifetime = LIFETIME,
-		.psk = PSK_KEY,
-		.bootstrap = BOOTSTRAP,
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+		.uri = SERVER_URI, .lifetime = LIFETIME, .psk = PSK_KEY, .bootstrap = BOOTSTRAP,
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
 		.gps_nrf_prio_mode_timeout = GPS_NRF_PRIO_MODE_TIMEOUT,
 		.gps_nrf_prio_mode_cooldown = GPS_NRF_PRIO_MODE_COOLDOWN,
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#if defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) && !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 		.use_persistence = USE_PERSISTENCE,
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+#endif /* defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) &&
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 	};
 
-	struct device_id id;
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+	const char *ep_name = config_default_ep_name();
 
-	AVS_STATIC_ASSERT(sizeof(app_config.ep_name) >= sizeof(id.value) + sizeof(EP_NAME_PREFIX) -
-								sizeof('\0') + sizeof('-'),
-			  ep_name_buffer_too_small);
-	if (!get_device_id(&id)) {
-		(void)avs_simple_snprintf(app_config.ep_name, sizeof(app_config.ep_name),
-					  EP_NAME_PREFIX "-%s", id.value);
-	} else {
-		memcpy(app_config.ep_name, EP_NAME_PREFIX, sizeof(EP_NAME_PREFIX));
-	}
+	assert(strlen(ep_name) < sizeof(app_config.ep_name));
+	strcpy(app_config.ep_name, ep_name);
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 }
 
 void config_init(const struct shell *shell)
@@ -243,16 +269,21 @@ int config_set_option(const struct shell *shell, size_t argc, char **argv)
 	AVS_UNREACHABLE("Invalid option key");
 	return -1;
 }
+#endif // WITH_ANJAY_CLIENT_CONFIG
 
+#if defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 static int parse_uint32(const char *value, uint32_t *out)
 {
 	return sscanf(value, "%" PRIu32, out) == 1 ? 0 : -1;
 }
+#endif // defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 const char *config_get_endpoint_name(void)
 {
 	return app_config.ep_name;
 }
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 
 #ifdef CONFIG_WIFI
 const char *config_get_wifi_ssid(void)
@@ -266,6 +297,7 @@ const char *config_get_wifi_password(void)
 }
 #endif // CONFIG_WIFI
 
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 const char *config_get_server_uri(void)
 {
 	return app_config.uri;
@@ -288,6 +320,7 @@ bool config_is_bootstrap(void)
 {
 	return app_config.bootstrap[0] == 'y';
 }
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
 uint32_t config_get_gps_nrf_prio_mode_timeout(void)
@@ -307,13 +340,17 @@ uint32_t config_get_gps_nrf_prio_mode_cooldown(void)
 }
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#if defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) && !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 bool config_is_use_persistence(void)
 {
 	return app_config.use_persistence[0] == 'y';
 }
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+#endif /* defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) &&
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 
+#if defined(CONFIG_WIFI) || defined(CONFIG_ANJAY_CLIENT_GPS_NRF) ||                                \
+	!defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 static int string_validate(const struct shell *shell, const char *value, size_t value_len,
 			   const struct anjay_client_option *option)
 {
@@ -325,7 +362,11 @@ static int string_validate(const struct shell *shell, const char *value, size_t 
 
 	return 0;
 }
+#endif /* defined(CONFIG_WIFI) || defined(CONFIG_ANJAY_CLIENT_GPS_NRF) ||
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 static int flag_validate(const struct shell *shell, const char *value, size_t value_len,
 			 const struct anjay_client_option *option)
 {
@@ -336,7 +377,9 @@ static int flag_validate(const struct shell *shell, const char *value, size_t va
 
 	return 0;
 }
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 
+#if defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 static int uint32_validate(const struct shell *shell, const char *value, size_t value_len,
 			   const struct anjay_client_option *option)
 {
@@ -353,3 +396,4 @@ static int uint32_validate(const struct shell *shell, const char *value, size_t 
 
 	return 0;
 }
+#endif // defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)

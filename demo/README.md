@@ -91,12 +91,12 @@ Additionally, you can define `status-led` alias for a LED, which blinks when Anj
 
 To connect to [Coiote IoT Device
 Management](https://www.avsystem.com/products/coiote-iot-device-management-platform/)
-LwM2M Server, please register at https://www.avsystem.com/try-anjay/. Then have
+LwM2M Server, please register at https://eu.iot.avsystem.cloud/. Then have
 a look at the Configuration menu to configure security credentials and other
 necessary settings (like Wi-Fi SSID etc.).
 
-[Video guide showing basic usage of Try-Anjay](https://www.youtube.com/watch?v=fgy38XfttM8)
-is available on YouTube.
+[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/Coiote_DM_Device_Onboarding/Quick_start/)
+is available on IoT Developer Zone.
 
 NOTE: You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI
 can be changed in the Configuration menu.
@@ -126,3 +126,13 @@ Subcommands:
 ## Upgrading the firmware over-the-air
 
 To upgrade the firmware, upload `build/zephyr/app_update.bin` file using standard means of LwM2M Firmware Update object.
+
+## Factory provisioning (experimental)
+
+This application supports experimental factory provisioning feature of Anjay 3.0, thanks
+to which the user is able to pre-provision credentials to the device using a specially
+tailored version of the application. This feature allows to easily pre-provision large
+quantities of devices in a semi-automatic manner.
+
+To use this feature, generate a special file containing the credentials using our [Factory Provisioning Tool](https://avsystem.github.io/Anjay-doc/Tools/FactoryProvisioning.html).
+Then, follow the flow described in `src/factory_provisioning/factory_flash.c` file to finish the process.

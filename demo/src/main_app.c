@@ -15,8 +15,11 @@
  */
 
 #include <devicetree.h>
+#include <kernel.h>
 #include <stdlib.h>
 #include <sys/printk.h>
+#include <logging/log.h>
+#include <logging/log_ctrl.h>
 #include <version.h>
 
 #include <net/dns_resolve.h>
@@ -25,11 +28,10 @@
 
 #include <anjay/anjay.h>
 #include <anjay/access_control.h>
-#include <anjay/attr_storage.h>
+#include <anjay/factory_provisioning.h>
 #include <anjay/security.h>
 #include <anjay/server.h>
 
-#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_prng.h>
 #include <avsystem/commons/avs_crypto_psk.h>
 
@@ -61,6 +63,7 @@
 #include "nrf_lc_info.h"
 #endif // CONFIG_ANJAY_CLIENT_NRF_LC_INFO
 
+LOG_MODULE_REGISTER(main_app);
 static const anjay_dm_object_def_t **buzzer_obj;
 static const anjay_dm_object_def_t **device_obj;
 static const anjay_dm_object_def_t **led_color_light_obj;
@@ -104,7 +107,7 @@ static void set_system_time(const struct sntp_time *time)
 	struct timespec ts = { .tv_sec = time->seconds,
 			       .tv_nsec = ((uint64_t)time->fraction * 1000000000) >> 32 };
 	if (clock_settime(CLOCK_REALTIME, &ts)) {
-		avs_log(zephyr_demo, WARNING, "Failed to set time");
+		LOG_WRN("Failed to set time");
 	}
 }
 #else // CONFIG_BOARD_DISCO_L475_IOT1
@@ -123,7 +126,7 @@ void synchronize_clock(void)
 	const uint32_t timeout_ms = 5000;
 
 	if (sntp_simple(NTP_SERVER, timeout_ms, &time)) {
-		avs_log(zephyr_demo, WARNING, "Failed to get current time");
+		LOG_WRN("Failed to get current time");
 	} else {
 		set_system_time(&time);
 	}
@@ -186,6 +189,31 @@ static int register_objects(anjay_t *anjay)
 	return 0;
 }
 
+#ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+void cell_request_job(avs_sched_t *sched, const void *cell_request_job_args_ptr)
+{
+	struct cell_request_job_args args =
+		*(const struct cell_request_job_args *)cell_request_job_args_ptr;
+	loc_assist_object_send_cell_request(args.anjay, loc_assist_obj, ecid_obj,
+					    args.request_type);
+}
+#endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+void agps_request_job(avs_sched_t *sched, const void *anjay_ptr)
+{
+	static const uint32_t full_mask =
+		LOC_ASSIST_A_GPS_MASK_UTC | LOC_ASSIST_A_GPS_MASK_KLOBUCHAR |
+		LOC_ASSIST_A_GPS_MASK_NEQUICK | LOC_ASSIST_A_GPS_MASK_TOW |
+		LOC_ASSIST_A_GPS_MASK_CLOCK | LOC_ASSIST_A_GPS_MASK_LOCATION |
+		LOC_ASSIST_A_GPS_MASK_INTEGRITY | LOC_ASSIST_A_GPS_MASK_EPHEMERIS |
+		LOC_ASSIST_A_GPS_MASK_ALMANAC;
+	LOG_INF("Manual request of A-GPS data");
+	loc_assist_object_send_agps_request(*(anjay_t *const *)anjay_ptr, loc_assist_obj,
+					    full_mask);
+}
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+
 static void update_objects_frequent(anjay_t *anjay)
 {
 	device_object_update(anjay, device_obj);
@@ -207,16 +235,6 @@ static void update_objects_nrf_lc_info(anjay_t *anjay, const struct nrf_lc_info 
 	ecid_object_update(anjay, ecid_obj, nrf_lc_info);
 }
 #endif // CONFIG_ANJAY_CLIENT_NRF_LC_INFO
-
-#ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
-void cell_request_job(avs_sched_t *sched, const void *cell_request_job_args_ptr)
-{
-	struct cell_request_job_args args =
-		*(const struct cell_request_job_args *)cell_request_job_args_ptr;
-	loc_assist_object_send_cell_request(args.anjay, loc_assist_obj, ecid_obj,
-					    args.request_type);
-}
-#endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 
 static void update_objects(avs_sched_t *sched, const void *anjay_ptr)
 {
@@ -241,13 +259,14 @@ static void update_objects(avs_sched_t *sched, const void *anjay_ptr)
 	uint32_t request_mask = gps_fetch_modem_agps_request_mask();
 
 	if (request_mask) {
+		LOG_INF("Modem requests A-GPS data");
 		loc_assist_object_send_agps_request(anjay, loc_assist_obj, request_mask);
 	}
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 
 #ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
 	if (config_is_use_persistence() && persist_anjay_if_required(anjay)) {
-		avs_log(zephyr_demo, ERROR, "Couldn't persist Anjay's state!");
+		LOG_ERR("Couldn't persist Anjay's state!");
 	}
 #endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
@@ -279,7 +298,7 @@ static void release_objects(void)
 
 void initialize_network(void)
 {
-	avs_log(zephyr_demo, INFO, "Initializing network connection...");
+	LOG_INF("Initializing network connection...");
 #ifdef CONFIG_WIFI
 	struct net_if *iface = net_if_get_default();
 
@@ -290,7 +309,7 @@ void initialize_network(void)
 	// Set regulatory domain to "World Wide (passive Ch12-14)"; eS-WiFi defaults
 	// to "US" which prevents connecting to networks that use channels 12-14.
 	if (eswifi_at_cmd(eswifi, "CN=XV\r") < 0) {
-		avs_log(zephyr_demo, WARNING, "Failed to set Wi-Fi regulatory domain");
+		LOG_WRN("Failed to set Wi-Fi regulatory domain");
 	}
 #endif // CONFIG_WIFI_ESWIFI
 
@@ -304,7 +323,8 @@ void initialize_network(void)
 
 	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
 		     sizeof(struct wifi_connect_req_params))) {
-		avs_log(zephyr_demo, ERROR, "Failed to configure Wi-Fi");
+		LOG_ERR("Failed to configure Wi-Fi");
+		LOG_PANIC();
 		exit(1);
 	}
 
@@ -313,66 +333,17 @@ void initialize_network(void)
 	int ret = lte_lc_init_and_connect();
 
 	if (ret < 0) {
-		avs_log(zephyr_demo, ERROR, "LTE link could not be established.");
+		LOG_ERR("LTE link could not be established.");
+		LOG_PANIC();
 		exit(1);
 	}
 #endif // CONFIG_WIFI
-	avs_log(zephyr_demo, INFO, "Connected to network");
+	LOG_INF("Connected to network");
 }
 
-static anjay_t *initialize_anjay(void)
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+static int configure_servers_from_config(anjay_t *anjay, const anjay_configuration_t *config)
 {
-	const anjay_configuration_t config = {
-		.endpoint_name = config_get_endpoint_name(),
-		.in_buffer_size = 4000,
-		.out_buffer_size = 4000,
-		.udp_dtls_hs_tx_params =
-			&(const avs_net_dtls_handshake_timeouts_t){
-				// Change the default DTLS handshake parameters so that "anjay stop"
-				// is more responsive; note that an exponential backoff is
-				// implemented, so the maximum of 8 seconds adds up to up to 15
-				// seconds in total.
-				.min = { .seconds = 1, .nanoseconds = 0 },
-				.max = { .seconds = 8, .nanoseconds = 0 } },
-		.disable_legacy_server_initiated_bootstrap = true
-	};
-
-	anjay_t *anjay = anjay_new(&config);
-
-	if (!anjay) {
-		avs_log(zephyr_demo, ERROR, "Could not create Anjay object");
-		return NULL;
-	}
-
-	if (anjay_security_object_install(anjay) ||
-	    anjay_server_object_install(anjay)
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
-	    // Access Control object is necessary if Server Object with many servers is loaded
-	    || anjay_access_control_install(anjay)
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
-	) {
-		avs_log(zephyr_demo, ERROR, "Failed to install necessary modules");
-		goto error;
-	}
-
-#ifdef CONFIG_ANJAY_CLIENT_FOTA
-	if (fw_update_install(anjay)) {
-		avs_log(zephyr_demo, ERROR, "Failed to initialize fw update module");
-		goto error;
-	}
-#endif // CONFIG_ANJAY_CLIENT_FOTA
-
-	if (register_objects(anjay)) {
-		avs_log(zephyr_demo, ERROR, "Failed to initialize objects");
-		goto error;
-	}
-
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
-	if (config_is_use_persistence() && !restore_anjay_from_persistence(anjay)) {
-		return anjay;
-	}
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
-
 	const bool bootstrap = config_is_bootstrap();
 
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
@@ -380,14 +351,14 @@ static anjay_t *initialize_anjay(void)
 	avs_crypto_psk_key_info_t psk_key_info =
 		avs_crypto_psk_key_info_from_buffer(psk_key, strlen(psk_key));
 	if (avs_is_err(avs_crypto_psk_engine_key_store(PSK_QUERY, &psk_key_info))) {
-		avs_log(zephyr_demo, ERROR, "Storing PSK key failed");
-		goto error;
+		LOG_ERR("Storing PSK key failed");
+		return -1;
 	}
 	avs_crypto_psk_identity_info_t identity_info = avs_crypto_psk_identity_info_from_buffer(
-		config.endpoint_name, strlen(config.endpoint_name));
+		config->endpoint_name, strlen(config->endpoint_name));
 	if (avs_is_err(avs_crypto_psk_engine_identity_store(PSK_QUERY, &identity_info))) {
-		avs_log(zephyr_demo, ERROR, "Storing PSK identity failed");
-		goto error;
+		LOG_ERR("Storing PSK identity failed");
+		return -1;
 	}
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 
@@ -400,7 +371,7 @@ static anjay_t *initialize_anjay(void)
 		.psk_identity = avs_crypto_psk_identity_info_from_engine(PSK_QUERY),
 		.psk_key = avs_crypto_psk_key_info_from_engine(PSK_QUERY),
 #else // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
-		.public_cert_or_psk_identity = config.endpoint_name,
+		.public_cert_or_psk_identity = config->endpoint_name,
 		.public_cert_or_psk_identity_size =
 			strlen(security_instance.public_cert_or_psk_identity),
 		.private_cert_or_psk_key = config_get_psk(),
@@ -418,8 +389,8 @@ static anjay_t *initialize_anjay(void)
 	anjay_iid_t security_instance_id = ANJAY_ID_INVALID;
 
 	if (anjay_security_object_add_instance(anjay, &security_instance, &security_instance_id)) {
-		avs_log(zephyr_demo, ERROR, "Failed to instantiate Security object");
-		goto error;
+		LOG_ERR("Failed to instantiate Security object");
+		return -1;
 	}
 
 	if (!bootstrap) {
@@ -427,19 +398,88 @@ static anjay_t *initialize_anjay(void)
 
 		if (anjay_server_object_add_instance(anjay, &server_instance,
 						     &server_instance_id)) {
-			avs_log(zephyr_demo, ERROR, "Failed to instantiate Server object");
-			goto error;
+			LOG_ERR("Failed to instantiate Server object");
+			return -1;
 		}
 	}
 
-	return anjay;
+	return 0;
+}
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+
+static anjay_t *initialize_anjay(void)
+{
+	const anjay_configuration_t config = {
+#ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+		.endpoint_name = config_default_ep_name(),
+#else // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+		.endpoint_name = config_get_endpoint_name(),
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+		.in_buffer_size = 4000,
+		.out_buffer_size = 4000,
+		.udp_dtls_hs_tx_params =
+			&(const avs_net_dtls_handshake_timeouts_t){
+				// Change the default DTLS handshake parameters so that "anjay stop"
+				// is more responsive; note that an exponential backoff is
+				// implemented, so the maximum of 8 seconds adds up to up to 15
+				// seconds in total.
+				.min = { .seconds = 1, .nanoseconds = 0 },
+				.max = { .seconds = 8, .nanoseconds = 0 } },
+		.disable_legacy_server_initiated_bootstrap = true
+	};
+
+	anjay_t *anjay = anjay_new(&config);
+
+	if (!anjay) {
+		LOG_ERR("Could not create Anjay object");
+		return NULL;
+	}
+
+	if (anjay_security_object_install(anjay) ||
+	    anjay_server_object_install(anjay)
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+	    // Access Control object is necessary if Server Object with many servers is loaded
+	    || anjay_access_control_install(anjay)
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+	) {
+		LOG_ERR("Failed to install necessary modules");
+		goto error;
+	}
+
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+	if (fw_update_install(anjay)) {
+		LOG_ERR("Failed to initialize fw update module");
+		goto error;
+	}
+#endif // CONFIG_ANJAY_CLIENT_FOTA
+
+	if (register_objects(anjay)) {
+		LOG_ERR("Failed to initialize objects");
+		goto error;
+	}
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+	if (config_is_use_persistence() && !restore_anjay_from_persistence(anjay)) {
+		return anjay;
+	}
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+
+#ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+	if (!restore_anjay_from_factory_provisioning(anjay)) {
+		return anjay;
+	}
+#else // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+	if (!configure_servers_from_config(anjay, &config)) {
+		return anjay;
+	}
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+
 error:
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 	if (avs_is_err(avs_crypto_psk_engine_key_rm(PSK_QUERY))) {
-		avs_log(zephyr_demo, WARNING, "Removing PSK key failed");
+		LOG_WRN("Removing PSK key failed");
 	}
 	if (avs_is_err(avs_crypto_psk_engine_identity_rm(PSK_QUERY))) {
-		avs_log(zephyr_demo, WARNING, "Removing PSK identity failed");
+		LOG_WRN("Removing PSK identity failed");
 	}
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 	anjay_delete(anjay);
@@ -456,7 +496,7 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 	anjay_t *anjay = initialize_anjay();
 
 	if (anjay) {
-		avs_log(zephyr_demo, INFO, "Successfully created thread");
+		LOG_INF("Successfully created thread");
 
 		SYNCHRONIZED(global_anjay_mutex)
 		{
@@ -466,13 +506,14 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 		// anjay stop could be called immediately after anjay start
 		if (atomic_load(&anjay_running)) {
 			update_objects(anjay_get_scheduler(anjay), &anjay);
-			anjay_event_loop_run(anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
+			anjay_event_loop_run_with_error_handling(
+				anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
 		}
 
 		avs_sched_del(&update_objects_handle);
 #ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
 		if (config_is_use_persistence() && persist_anjay_if_required(anjay)) {
-			avs_log(zephyr_demo, ERROR, "Couldn't persist Anjay's state!");
+			LOG_ERR("Couldn't persist Anjay's state!");
 		}
 #endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
@@ -485,10 +526,10 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 		if (avs_is_err(avs_crypto_psk_engine_key_rm(PSK_QUERY))) {
-			avs_log(zephyr_demo, WARNING, "Removing PSK key failed");
+			LOG_WRN("Removing PSK key failed");
 		}
 		if (avs_is_err(avs_crypto_psk_engine_identity_rm(PSK_QUERY))) {
-			avs_log(zephyr_demo, WARNING, "Removing PSK identity failed");
+			LOG_WRN("Removing PSK identity failed");
 		}
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 
@@ -508,16 +549,17 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 
 void main(void)
 {
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 	config_init(shell_backend_uart_get_ptr());
+#endif // WITH_ANJAY_CLIENT_CONFIG
 
 #ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
 	if (persistence_init()) {
-		avs_log(zephyr_demo, ERROR, "Can't initialize persistence");
+		LOG_ERR("Can't initialize persistence");
 	}
 #endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
 	status_led_init();
-
 	initialize_network();
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS
@@ -530,7 +572,8 @@ void main(void)
 
 #ifdef CONFIG_ANJAY_CLIENT_NRF_LC_INFO
 	if (initialize_nrf_lc_info_listener()) {
-		avs_log(zephyr_demo, ERROR, "Can't initialize Link Control info listener");
+		LOG_ERR("Can't initialize Link Control info listener");
+		LOG_PANIC();
 		exit(1);
 	}
 #endif // CONFIG_ANJAY_CLIENT_NRF_LC_INFO

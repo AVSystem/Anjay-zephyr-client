@@ -160,7 +160,6 @@ static void incoming_pvt_work_handler(struct k_work *work)
 				LOG_ERR("Couldn't enable gnss_prio_mode");
 				return;
 			}
-			LOG_WRN("gnss_prio_mode enabled");
 
 			SYNCHRONIZED(global_anjay_mutex)
 			{

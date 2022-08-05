@@ -10,7 +10,7 @@ The following examples are present:
 
 | Directory      | Description                                                                                                                                            |
 |----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| demo/          | Showcase example implementing all features and sensors available on board. Supported boards:<br>[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>[nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>any other board of your choice (by adding appropriate `*.conf`/`*.overlay` files). FOTA support for selected boards.|
+| demo/          | Showcase example implementing all features and sensors available on board. Supports experimental **factory provisioning** feature of Anjay 3.0. Supported boards:<br>[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>[nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>any other board of your choice (by adding appropriate `*.conf`/`*.overlay` files). FOTA support for selected boards.|
 | minimal/       | Minimalistic client samples which may serve as a base for specific application. Supported boards/targets:<br>[qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)<br>[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>[nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)|
 | ei_demo/       | An example containing motion recognition model, built with Edge Impulse. Supported boards/targets:<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)|
 
@@ -101,12 +101,12 @@ started by choosing Actions -> Build.
 
 To connect to [Coiote IoT Device
 Management](https://www.avsystem.com/products/coiote-iot-device-management-platform/)
-LwM2M Server, please register at https://www.avsystem.com/try-anjay/. Then have
+LwM2M Server, please register at https://eu.iot.avsystem.cloud/. Then have
 a look at the example configuration to configure security credentials and other
 necessary settings (like Wi-Fi SSID etc.).
 
-[Video guide showing basic usage of Try-Anjay](https://www.youtube.com/watch?v=fgy38XfttM8)
-is available on YouTube.
+[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/Coiote_DM_Device_Onboarding/Quick_start/)
+is available on IoT Developer Zone.
 
 > **__NOTE:__**
 > You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI can

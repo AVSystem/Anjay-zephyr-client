@@ -14,11 +14,11 @@ config ANJAY_CLIENT_ENDPOINT_NAME
 
 config ANJAY_CLIENT_VERSION
 	string "Client Version"
-	default "22.06"
+	default "22.08"
 
 config ANJAY_CLIENT_SERVER_URI
 	string "Server URI"
-	default "coaps://try-anjay.avsystem.com:5684"
+	default "coaps://eu.iot.avsystem.cloud:5684"
 
 config ANJAY_CLIENT_PSK_IDENTITY
 	string "PSK Identity"

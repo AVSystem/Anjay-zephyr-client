@@ -23,4 +23,12 @@ int persistence_init(void);
 int persistence_purge(void);
 int restore_anjay_from_persistence(anjay_t *anjay);
 int persist_anjay_if_required(anjay_t *anjay);
-#endif
+
+#ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+int restore_anjay_from_factory_provisioning(anjay_t *anjay);
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
+#ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH
+bool is_factory_provisioning_info_present(void);
+int persist_factory_provisioning_info(anjay_t *anjay);
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE

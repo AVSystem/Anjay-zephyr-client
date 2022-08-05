@@ -33,7 +33,7 @@ extern struct k_mutex global_anjay_mutex;
 extern volatile atomic_bool anjay_running;
 
 #define ANJAY_THREAD_PRIO 1
-#define ANJAY_THREAD_STACK_SIZE 4096
+#define ANJAY_THREAD_STACK_SIZE 8192
 extern struct k_thread anjay_thread;
 extern volatile bool anjay_thread_running;
 extern struct k_mutex anjay_thread_running_mutex;
@@ -46,3 +46,6 @@ struct cell_request_job_args {
 };
 avs_sched_clb_t cell_request_job;
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+avs_sched_clb_t agps_request_job;
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS

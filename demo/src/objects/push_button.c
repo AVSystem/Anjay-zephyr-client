@@ -21,13 +21,15 @@
 #include <anjay/ipso_objects.h>
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_list.h>
-#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_memory.h>
 
 #include <devicetree.h>
 #include <drivers/gpio.h>
+#include <logging/log.h>
 
 #include "objects.h"
+
+LOG_MODULE_REGISTER(push_button);
 
 #if PUSH_BUTTON_AVAILABLE_ANY
 struct push_button_instance_glue {
@@ -108,7 +110,7 @@ static void button_state_changed(const struct device *dev, struct gpio_callback 
 		}
 	}
 
-	avs_log(push_button, ERROR, "Could not schedule the work");
+	LOG_ERR("Could not schedule the work");
 }
 
 static int configure_push_button(anjay_t *anjay, const struct device *dev, int gpio_pin,

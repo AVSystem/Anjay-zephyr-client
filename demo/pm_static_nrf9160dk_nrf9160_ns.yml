@@ -15,10 +15,10 @@ EMPTY_1:
   region: flash_primary
   size: 0x8000
 app:
-  address: 0x20200
+  address: 0x1c200
   end_address: 0x78000
   region: flash_primary
-  size: 0x57e00
+  size: 0x5be00
 mcuboot:
   address: 0x0
   end_address: 0x10000
@@ -43,7 +43,7 @@ mcuboot_primary:
   orig_span: &id001
   - mcuboot_pad
   - app
-  - spm
+  - tfm
   region: flash_primary
   sharers: 0x1
   size: 0x68000
@@ -53,7 +53,7 @@ mcuboot_primary_app:
   end_address: 0x78000
   orig_span: &id002
   - app
-  - spm
+  - tfm
   region: flash_primary
   size: 0x67e00
   span: *id002
@@ -79,21 +79,43 @@ mcuboot_secondary:
   share_size:
   - mcuboot_primary
   size: 0x68000
-settings_storage:
+nonsecure_storage:
   address: 0xfe000
   end_address: 0x100000
+  orig_span: &id003
+  - settings_storage
   placement:
     before:
     - end
   region: flash_primary
   size: 0x2000
-spm:
+  span: *id003
+settings_storage:
+  address: 0xfe000
+  end_address: 0x100000
+  inside:
+  - nonsecure_storage
+  placement:
+    before:
+    - end
+  region: flash_primary
+  size: 0x2000
+tfm:
   address: 0x10200
-  end_address: 0x20200
+  end_address: 0x1c200
   inside:
   - mcuboot_primary_app
   placement:
     before:
     - app
   region: flash_primary
-  size: 0x10000
+  size: 0xc000
+tfm_secure:
+  address: 0x10000
+  end_address: 0x1c200
+  orig_span: &id004
+  - mcuboot_pad
+  - tfm
+  region: flash_primary
+  size: 0xc200
+  span: *id004

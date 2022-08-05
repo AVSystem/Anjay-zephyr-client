@@ -15,12 +15,12 @@
  */
 #include <assert.h>
 #include <stdbool.h>
+#include <logging/log.h>
 
 #include <anjay/anjay.h>
 #include <anjay/lwm2m_send.h>
 #include <anjay/server.h>
 
-#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_memory.h>
 
@@ -30,6 +30,8 @@
 
 #include "objects.h"
 #include "../nrf_lc_info.h"
+
+LOG_MODULE_REGISTER(loc_assist);
 
 /**
  * Assistance type: R, Single, Mandatory
@@ -142,7 +144,6 @@ struct loc_assist_object {
 	size_t assistance_data_len;
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
-	bool location_requested;
 	struct loc_assist_location location_current;
 	struct loc_assist_location location_backup;
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
@@ -250,7 +251,7 @@ static int resource_write(anjay_t *anjay, const anjay_dm_object_def_t *const *ob
 		if (err) {
 			return ANJAY_ERR_INTERNAL;
 		}
-		avs_log(loc_assist, WARNING, "Received result code: %s", value);
+		LOG_WRN("Received result code: %s", value);
 		return 0;
 	}
 
@@ -329,6 +330,8 @@ static int transaction_commit(anjay_t *anjay, const anjay_dm_object_def_t *const
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 	if (obj->assistance_data_len > 0) {
+		LOG_INF("Received %zu bytes of A-GPS data", obj->assistance_data_len);
+
 		int err =
 			nrf_cloud_agps_process(obj->assistance_data_buf, obj->assistance_data_len);
 		obj->assistance_data_len = 0;
@@ -344,17 +347,14 @@ static int transaction_commit(anjay_t *anjay, const anjay_dm_object_def_t *const
 
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 
-	if (obj->location_requested ||
-	    obj->location_current.latitude != obj->location_backup.latitude ||
+	if (obj->location_current.latitude != obj->location_backup.latitude ||
 	    obj->location_current.longitude != obj->location_backup.longitude ||
 	    obj->location_current.altitude != obj->location_backup.altitude ||
 	    obj->location_current.accuracy != obj->location_backup.accuracy) {
-		avs_log(log_ass, INFO,
-			"Updated cell-based location"
+		LOG_INF("Updated cell-based location"
 			", lat: %.3f deg, lon: %.3f deg, alt: %.3f m, acc: %.3f m",
 			obj->location_current.latitude, obj->location_current.longitude,
 			obj->location_current.altitude, obj->location_current.accuracy);
-		obj->location_requested = false;
 	}
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 
@@ -417,7 +417,7 @@ static int batch_compile_and_send(anjay_t *anjay, anjay_send_batch_builder_t **b
 	anjay_send_batch_t *batch = anjay_send_batch_builder_compile(builder_ptr);
 
 	if (!batch) {
-		avs_log(loc_assist, ERROR, "Batch compilation failed");
+		LOG_ERR("Batch compilation failed");
 		return result;
 	}
 
@@ -426,7 +426,7 @@ static int batch_compile_and_send(anjay_t *anjay, anjay_send_batch_builder_t **b
 	AVS_LIST(const anjay_ssid_t) ssids = anjay_server_get_ssids(anjay);
 
 	if (!ssids) {
-		avs_log(loc_assist, ERROR, "No servers to send the batch to");
+		LOG_ERR("No servers to send the batch to");
 	}
 
 	AVS_LIST(const anjay_ssid_t) ssid;
@@ -436,20 +436,17 @@ static int batch_compile_and_send(anjay_t *anjay, anjay_send_batch_builder_t **b
 		anjay_send_result_t send_result = anjay_send(anjay, *ssid, batch, NULL, NULL);
 
 		if (is_deferrable_condition(send_result)) {
-			avs_log(loc_assist, WARNING,
-				"Target SSID=%" PRIu16 " is offline, attempting "
+			LOG_WRN("Target SSID=%" PRIu16 " is offline, attempting "
 				"deferred send",
 				*ssid);
 			send_result = anjay_send_deferrable(anjay, *ssid, batch, NULL, NULL);
 		}
 
 		if (send_result) {
-			avs_log(loc_assist, ERROR,
-				"Couldn't send the %s request to SSID=%" PRIu16 ", err: %d",
+			LOG_ERR("Couldn't send the %s request to SSID=%" PRIu16 ", err: %d",
 				req_kind, *ssid, send_result);
 		} else {
-			avs_log(loc_assist, INFO, "Sent the %s request to SSID=%" PRIu16, req_kind,
-				*ssid);
+			LOG_INF("Sent the %s request to SSID=%" PRIu16, req_kind, *ssid);
 			result = 0;
 		}
 	}
@@ -471,8 +468,8 @@ static int add_conn_mon_to_batch(anjay_t *anjay, anjay_send_batch_builder_t *bui
 	int result = anjay_send_batch_data_add_current_multiple(builder, anjay, conn_mon_paths,
 								AVS_ARRAY_SIZE(conn_mon_paths));
 	if (result) {
-		avs_log(loc_assist, ERROR,
-			"Failed to add Connectivity Monitoring required resources to batch, err: %d",
+		LOG_ERR("Failed to add Connectivity Monitoring "
+			"required resources to batch, err: %d",
 			result);
 	}
 	return result;
@@ -488,18 +485,43 @@ void loc_assist_object_send_agps_request(anjay_t *anjay,
 	}
 	assert(*obj_def == &OBJ_DEF);
 
+	static const struct {
+		uint32_t req_flag;
+		const char *name;
+	} agps_flag_names[] = {
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_UTC, .name = "UTC parameters" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_KLOBUCHAR,
+		  .name = "Klobuchar ionospheric correction parameters" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_NEQUICK,
+		  .name = "NeQuick ionospheric correction parameters" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_TOW, .name = "SV time of week" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_CLOCK, .name = "GPS system time" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_LOCATION,
+		  .name = "Position assistance parameters" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_INTEGRITY,
+		  .name = "Integrity assistance parameters" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_EPHEMERIS, .name = "GPS ephemeris" },
+		{ .req_flag = LOC_ASSIST_A_GPS_MASK_ALMANAC, .name = "GPS almanac" }
+	};
+
+	LOG_INF("Requesting following types of A-GPS data:");
+	for (size_t i = 0; i < AVS_ARRAY_SIZE(agps_flag_names); i++) {
+		if (agps_flag_names[i].req_flag & request_mask) {
+			LOG_INF("%s", agps_flag_names[i].name);
+		}
+	}
+
 	anjay_send_batch_builder_t *builder = anjay_send_batch_builder_new();
 
 	if (!builder) {
-		avs_log(loc_assist, ERROR, "Failed to allocate batch builder");
+		LOG_ERR("Failed to allocate batch builder");
 		return;
 	}
 
 	int result = anjay_send_batch_add_int(builder, OBJ_DEF.oid, 0, RID_ASSISTANCE_TYPE,
 					      UINT16_MAX, avs_time_real_now(), 5);
 	if (result) {
-		avs_log(loc_assist, ERROR, "Failed to add assistance type to batch, err: %d",
-			result);
+		LOG_ERR("Failed to add assistance type to batch, err: %d", result);
 		goto finalize_batch;
 	}
 
@@ -507,8 +529,7 @@ void loc_assist_object_send_agps_request(anjay_t *anjay,
 	result = anjay_send_batch_add_int(builder, OBJ_DEF.oid, 0, RID_A_GPS_ASSISTANCE_MASK,
 					  UINT16_MAX, avs_time_real_now(), request_mask);
 	if (result) {
-		avs_log(loc_assist, ERROR, "Failed to add assistance type to batch, err: %d",
-			result);
+		LOG_ERR("Failed to add assistance type to batch, err: %d", result);
 		goto finalize_batch;
 	}
 
@@ -541,15 +562,14 @@ void loc_assist_object_send_cell_request(anjay_t *anjay,
 	anjay_send_batch_builder_t *builder = anjay_send_batch_builder_new();
 
 	if (!builder) {
-		avs_log(loc_assist, ERROR, "Failed to allocate batch builder");
+		LOG_ERR("Failed to allocate batch builder");
 		return;
 	}
 
 	int result = anjay_send_batch_add_int(builder, OBJ_DEF.oid, 0, RID_ASSISTANCE_TYPE,
 					      UINT16_MAX, avs_time_real_now(), request_type);
 	if (result) {
-		avs_log(loc_assist, ERROR, "Failed to add assistance type to batch, err: %d",
-			result);
+		LOG_ERR("Failed to add assistance type to batch, err: %d", result);
 		goto finalize_batch;
 	}
 
@@ -574,8 +594,7 @@ void loc_assist_object_send_cell_request(anjay_t *anjay,
 			result = anjay_send_batch_data_add_current_multiple(
 				builder, anjay, ecid_paths, AVS_ARRAY_SIZE(ecid_paths));
 			if (result) {
-				avs_log(loc_assist, ERROR,
-					"Failed to add ECID required resources, iid: %" PRIu16
+				LOG_ERR("Failed to add ECID required resources, iid: %" PRIu16
 					", err: %d",
 					iid, result);
 				goto finalize_batch;
@@ -589,10 +608,7 @@ finalize_batch:
 		return;
 	}
 
-	if (!batch_compile_and_send(anjay, &builder, "cell-based location")) {
-		get_obj(loc_assist_def)->location_requested = true;
-	}
-
+	batch_compile_and_send(anjay, &builder, "cell-based location");
 	anjay_send_batch_builder_cleanup(&builder);
 }
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED

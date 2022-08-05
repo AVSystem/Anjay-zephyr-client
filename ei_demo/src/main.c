@@ -17,6 +17,7 @@
 #include <devicetree.h>
 #include <stdlib.h>
 #include <sys/printk.h>
+#include <logging/log.h>
 #include <version.h>
 
 #include <net/dns_resolve.h>
@@ -40,12 +41,13 @@
 #include <net/net_event.h>
 #include <net/net_mgmt.h>
 
-#include <avsystem/commons/avs_log.h>
 #include <avsystem/commons/avs_prng.h>
 
 #include "led.h"
 
 #include "objects/objects.h"
+
+LOG_MODULE_REGISTER(zephyr_demo);
 
 static const anjay_dm_object_def_t **device_obj;
 static const anjay_dm_object_def_t **pattern_detector_obj;
@@ -64,7 +66,7 @@ static void set_system_time(const struct sntp_time *time)
 	struct timespec ts = { .tv_sec = time->seconds,
 			       .tv_nsec = ((uint64_t)time->fraction * 1000000000) >> 32 };
 	if (clock_settime(CLOCK_REALTIME, &ts)) {
-		avs_log(zephyr_demo, WARNING, "Failed to set time");
+		LOG_WRN("Failed to set time");
 	}
 }
 #else // CONFIG_POSIX_API
@@ -83,7 +85,7 @@ void synchronize_clock(void)
 	const uint32_t timeout_ms = 5000;
 
 	if (sntp_simple(CONFIG_ANJAY_CLIENT_NTP_SERVER, timeout_ms, &time)) {
-		avs_log(zephyr_demo, WARNING, "Failed to get current time");
+		LOG_WRN("Failed to get current time");
 	} else {
 		set_system_time(&time);
 	}
@@ -124,14 +126,14 @@ static void release_objects(void)
 
 void initialize_network(void)
 {
-	avs_log(zephyr_demo, INFO, "Initializing network connection...");
+	LOG_INF("Initializing network connection...");
 #ifdef CONFIG_LTE_LINK_CONTROL
 	if (lte_lc_init_and_connect() < 0) {
-		avs_log(zephyr_demo, ERROR, "LTE link could not be established.");
+		LOG_ERR("LTE link could not be established.");
 		exit(1);
 	}
 #endif // CONFIG_LTE_LINK_CONTROL
-	avs_log(zephyr_demo, INFO, "Connected to network");
+	LOG_INF("Connected to network");
 }
 
 void run_anjay(void *arg1, void *arg2, void *arg3)
@@ -147,18 +149,18 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 	anjay_t *anjay = anjay_new(&config);
 
 	if (!anjay) {
-		avs_log(zephyr_demo, ERROR, "Could not create Anjay object");
+		LOG_ERR("Could not create Anjay object");
 		exit(1);
 	}
 
 	// Install attr_storage and necessary objects
 	if (anjay_security_object_install(anjay) || anjay_server_object_install(anjay)) {
-		avs_log(zephyr_demo, ERROR, "Failed to install necessary modules");
+		LOG_ERR("Failed to install necessary modules");
 		goto cleanup;
 	}
 
 	if (register_objects(anjay)) {
-		avs_log(zephyr_demo, ERROR, "Failed to initialize objects");
+		LOG_ERR("Failed to initialize objects");
 		goto cleanup;
 	}
 
@@ -184,21 +186,22 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 	anjay_iid_t security_instance_id = ANJAY_ID_INVALID;
 
 	if (anjay_security_object_add_instance(anjay, &security_instance, &security_instance_id)) {
-		avs_log(zephyr_demo, ERROR, "Failed to instantiate Security object");
+		LOG_ERR("Failed to instantiate Security object");
 		goto cleanup;
 	}
 
 	anjay_iid_t server_instance_id = ANJAY_ID_INVALID;
 
 	if (anjay_server_object_add_instance(anjay, &server_instance, &server_instance_id)) {
-		avs_log(zephyr_demo, ERROR, "Failed to instantiate Server object");
+		LOG_ERR("Failed to instantiate Server object");
 		goto cleanup;
 	}
 
-	avs_log(zephyr_demo, INFO, "Successfully created thread");
+	LOG_INF("Successfully created thread");
 
 	update_objects(anjay_get_scheduler(anjay), &anjay);
-	anjay_event_loop_run(anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
+	anjay_event_loop_run_with_error_handling(anjay,
+						 avs_time_duration_from_scalar(1, AVS_TIME_S));
 
 cleanup:
 	avs_sched_del(&update_objects_handle);
@@ -218,5 +221,5 @@ void main(void)
 	k_thread_create(&anjay_thread, anjay_stack, ANJAY_THREAD_STACK_SIZE, run_anjay, NULL, NULL,
 			NULL, ANJAY_THREAD_PRIO, 0, K_NO_WAIT);
 	k_thread_join(&anjay_thread, K_FOREVER);
-	avs_log(zephyr_demo, INFO, "Anjay stopped");
+	LOG_INF("Anjay stopped");
 }

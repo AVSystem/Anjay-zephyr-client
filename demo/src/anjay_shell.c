@@ -31,8 +31,10 @@ static int cmd_anjay_start(const struct shell *shell, size_t argc, char **argv)
 	}
 
 	if (!atomic_load(&anjay_running)) {
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 		shell_print(shell, "Saving config");
 		config_save(shell_backend_uart_get_ptr());
+#endif // WITH_ANJAY_CLIENT_CONFIG
 		shell_print(shell, "Starting Anjay");
 		atomic_store(&anjay_running, true);
 	} else {
@@ -91,6 +93,7 @@ static int cmd_anjay_stop(const struct shell *shell, size_t argc, char **argv)
 	return 0;
 }
 
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 static int cmd_anjay_config_set(const struct shell *shell, size_t argc, char **argv)
 {
 	if (atomic_load(&anjay_running)) {
@@ -136,6 +139,7 @@ static int cmd_anjay_config_save(const struct shell *shell, size_t argc, char **
 
 	return 0;
 }
+#endif // WITH_ANJAY_CLIENT_CONFIG
 
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 static int cmd_anjay_nls_cell_request(const struct shell *shell, size_t argc, char **argv,
@@ -157,6 +161,28 @@ static int cmd_anjay_nls_cell_request(const struct shell *shell, size_t argc, ch
 	return 0;
 }
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+static int cmd_anjay_nls_agps_request(const struct shell *shell, size_t argc, char **argv,
+				      void *data)
+{
+	ARG_UNUSED(argc);
+	ARG_UNUSED(argv);
+
+	SYNCHRONIZED(global_anjay_mutex)
+	{
+		if (global_anjay) {
+			anjay_t *anjay = global_anjay;
+
+			AVS_SCHED_NOW(anjay_get_scheduler(anjay), NULL, agps_request_job, &anjay,
+				      sizeof(anjay));
+		} else {
+			shell_warn(shell, "Anjay is not running");
+		}
+	}
+	return 0;
+}
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 
 #ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
 static int cmd_anjay_persistence_purge(const struct shell *shell, size_t argc, char **argv,
@@ -199,17 +225,22 @@ static int cmd_anjay_session_cache_purge(const struct shell *shell, size_t argc,
 }
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_anjay_config_set,
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	SHELL_CMD(OPTION_KEY_EP_NAME, NULL, "Endpoint name", cmd_anjay_config_set),
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_WIFI
 	SHELL_CMD(OPTION_KEY_SSID, NULL, "Wi-Fi SSID", cmd_anjay_config_set),
 	SHELL_CMD(OPTION_KEY_PASSWORD, NULL, "Wi-Fi password", cmd_anjay_config_set),
 #endif // CONFIG_WIFI
+#ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	SHELL_CMD(OPTION_KEY_URI, NULL, "Server URI", cmd_anjay_config_set),
 	SHELL_CMD(OPTION_KEY_LIFETIME, NULL, "Device lifetime", cmd_anjay_config_set),
 	SHELL_CMD(OPTION_KEY_PSK, NULL, "PSK", cmd_anjay_config_set),
 	SHELL_CMD(OPTION_KEY_BOOTSTRAP, NULL, "Perform bootstrap", cmd_anjay_config_set),
+#endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
 	SHELL_CMD(OPTION_KEY_GPS_NRF_PRIO_MODE_TIMEOUT, NULL,
 		  "GPS priority mode timeout - determines (in seconds) for how "
@@ -223,12 +254,14 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 		  "to enable GPS priority mode again.",
 		  cmd_anjay_config_set),
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+#if defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) && !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 	SHELL_CMD(
 		OPTION_KEY_USE_PERSISTENCE, NULL,
 		"Enables persistence of Access Control Object, Attribute Storage, Security Object and Server Object.",
 		cmd_anjay_config_set),
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+#endif /* defined(CONFIG_ANJAY_CLIENT_PERSISTENCE) &&
+	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+	*/
 	SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_anjay_config,
@@ -238,6 +271,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_anjay_config,
 			       SHELL_CMD(set, &sub_anjay_config_set, "Change Anjay config", NULL),
 			       SHELL_CMD(show, NULL, "Show Anjay config", cmd_anjay_config_show),
 			       SHELL_SUBCMD_SET_END);
+#endif // WITH_ANJAY_CLIENT_CONFIG
 
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 SHELL_SUBCMD_DICT_SET_CREATE(
@@ -251,11 +285,17 @@ SHELL_SUBCMD_DICT_SET_CREATE(
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	sub_anjay, SHELL_CMD(start, NULL, "Save config and start Anjay", cmd_anjay_start),
 	SHELL_CMD(stop, NULL, "Stop Anjay", cmd_anjay_stop),
+#ifdef WITH_ANJAY_CLIENT_CONFIG
 	SHELL_CMD(config, &sub_anjay_config, "Configure Anjay params", NULL),
+#endif // WITH_ANJAY_CLIENT_CONFIG
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 	SHELL_CMD(nls_cell_request, &sub_anjay_nls_cell_request,
-		  "Make a request to Location Services", NULL),
+		  "Make a cell-based location request to Nordic Location Services", NULL),
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+	SHELL_CMD(nls_agps_request, NULL, "Make a manual A-GPS request to Nordic Location Services",
+		  cmd_anjay_nls_agps_request),
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 #ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
 	SHELL_CMD(persistence_purge, NULL, "Purges persisted Anjay state",
 		  cmd_anjay_persistence_purge),

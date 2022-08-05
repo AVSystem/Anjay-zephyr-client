@@ -17,12 +17,13 @@
 #include <anjay/anjay.h>
 #include <anjay/ipso_objects.h>
 
-#include <avsystem/commons/avs_log.h>
-
 #include <drivers/sensor.h>
 #include <zephyr.h>
+#include <logging/log.h>
 
 #include "objects.h"
+
+LOG_MODULE_REGISTER(basic_sensors);
 
 struct sensor_context {
 	const char *name;
@@ -75,7 +76,7 @@ int basic_sensor_get_value(anjay_iid_t iid, void *_ctx, double *value)
 
 	if (sensor_sample_fetch_chan(ctx->device, ctx->channel) ||
 	    sensor_channel_get(ctx->device, ctx->channel, &tmp_value)) {
-		avs_log(sensor, ERROR, "Failed to read from %s", ctx->device->name);
+		LOG_ERR("Failed to read from %s", ctx->device->name);
 		return -1;
 	}
 
@@ -94,14 +95,12 @@ void basic_sensors_install(anjay_t *anjay)
 		struct sensor_context *ctx = &basic_sensors_def[i];
 
 		if (!device_is_ready(ctx->device)) {
-			avs_log(ipso_object, WARNING, "Object: %s could not be installed",
-				ctx->name);
+			LOG_WRN("Object: %s could not be installed", ctx->name);
 			continue;
 		}
 
 		if (anjay_ipso_basic_sensor_install(anjay, ctx->oid, 1)) {
-			avs_log(ipso_object, WARNING, "Object: %s could not be installed",
-				ctx->name);
+			LOG_WRN("Object: %s could not be installed", ctx->name);
 			continue;
 		}
 
@@ -111,8 +110,7 @@ void basic_sensors_install(anjay_t *anjay)
 							.max_range_value = NAN,
 							.get_value = basic_sensor_get_value };
 		if (anjay_ipso_basic_sensor_instance_add(anjay, ctx->oid, 0, impl)) {
-			avs_log(ipso_object, WARNING, "Instance of %s object could not be added",
-				ctx->name);
+			LOG_WRN("Instance of %s object could not be added", ctx->name);
 		}
 	}
 }

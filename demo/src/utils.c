@@ -27,6 +27,7 @@
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#include <modem/modem_info.h>
 #include <nrf_socket.h>
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 
@@ -34,6 +35,12 @@ int get_device_id(struct device_id *out_id)
 {
 	memset(out_id->value, 0, sizeof(out_id->value));
 
+#ifdef CONFIG_NRF_MODEM_LIB
+	return (modem_info_init() ||
+		modem_info_string_get(MODEM_INFO_IMEI, out_id->value, sizeof(out_id->value)) < 0) ?
+		       -1 :
+		       0;
+#else // CONFIG_NRF_MODEM_LIB
 	uint8_t id[12];
 	ssize_t retval = hwinfo_get_device_id(id, sizeof(id));
 
@@ -42,6 +49,7 @@ int get_device_id(struct device_id *out_id)
 	}
 
 	return avs_hexlify(out_id->value, sizeof(out_id->value), NULL, id, (size_t)retval);
+#endif // CONFIG_NRF_MODEM_LIB
 }
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA

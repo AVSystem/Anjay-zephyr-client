@@ -41,8 +41,6 @@
 #define RGB_VALUE_STR_BUFLEN sizeof("#RRGGBB")
 #define RGB_COLOR_COUNT 3
 
-#define RGB_PIN(channel) DT_PROP(RGB_NODE, ch##channel##_pin)
-
 struct led_color_light_object {
 	const anjay_dm_object_def_t *def;
 
@@ -85,7 +83,7 @@ static int rgb_value_str_parse(struct led_color_light_object *obj)
 
 static int rgb_led_set(struct led_color_light_object *obj)
 {
-#define SET_COLOR(pin) pwm_pin_set_cycles(obj->dev, RGB_PIN(pin), 255, obj->rgb_value[pin], 0)
+#define SET_COLOR(pin) pwm_set_cycles(obj->dev, pin, 255, obj->rgb_value[pin], 0)
 
 	if (SET_COLOR(0) || SET_COLOR(1) || SET_COLOR(2)) {
 		return -1;

@@ -18,8 +18,9 @@
 
 #include <devicetree.h>
 #include <drivers/gpio.h>
+#include <logging/log.h>
 
-#include <avsystem/commons/avs_log.h>
+LOG_MODULE_REGISTER(status_led);
 
 #if STATUS_LED_AVAILABLE
 #define STATUS_LED_GPIO_PORT DT_GPIO_CTLR(STATUS_LED_NODE, gpios)
@@ -33,7 +34,7 @@ void status_led_init(void)
 	if (!device_is_ready(status_led_device) ||
 	    gpio_pin_configure(status_led_device, STATUS_LED_GPIO_PIN, STATUS_LED_GPIO_FLAGS)) {
 		status_led_device = NULL;
-		avs_log(status_led, WARNING, "failed to initialize status led");
+		LOG_WRN("failed to initialize status led");
 	}
 }
 
