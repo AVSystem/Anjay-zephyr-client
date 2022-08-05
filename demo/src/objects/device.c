@@ -215,7 +215,7 @@ static int resource_write(anjay_t *anjay, const anjay_dm_object_def_t *const *ob
 
 	switch (rid) {
 	case RID_CURRENT_TIME: {
-#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+#ifdef CONFIG_POSIX_API
 		struct timespec ts;
 
 		ts.tv_nsec = 0;
@@ -223,9 +223,9 @@ static int resource_write(anjay_t *anjay, const anjay_dm_object_def_t *const *ob
 			return -1;
 		}
 		return 0;
-#else // CONFIG_BOARD_DISCO_L475_IOT1
+#else // CONFIG_POSIX_API
 		return ANJAY_ERR_NOT_IMPLEMENTED;
-#endif // CONFIG_BOARD_DISCO_L475_IOT1
+#endif // CONFIG_POSIX_API
 	}
 	default:
 		return ANJAY_ERR_METHOD_NOT_ALLOWED;

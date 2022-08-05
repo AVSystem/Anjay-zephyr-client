@@ -261,13 +261,29 @@ static int config_at(void)
 
 int initialize_gps(void)
 {
-	if (config_at() || nrf_modem_gnss_event_handler_set(gnss_event_handler) ||
-	    nrf_modem_gnss_fix_retry_set(0) || nrf_modem_gnss_fix_interval_set(1) ||
-	    nrf_modem_gnss_start()) {
-		LOG_ERR("Failed to initialize GPS interface");
-		return -1;
+	if (config_at()) {
+		goto error;
 	}
+
+	int stop_result = nrf_modem_gnss_stop();
+
+	if (stop_result) {
+		// stop failed, which means that GNSS wasn't started already
+		if (nrf_modem_gnss_event_handler_set(gnss_event_handler) ||
+		    nrf_modem_gnss_fix_retry_set(0) || nrf_modem_gnss_fix_interval_set(1)) {
+			goto error;
+		}
+	}
+
+	if (nrf_modem_gnss_start()) {
+		goto error;
+	}
+
 	return 0;
+
+error:
+	LOG_ERR("Failed to initialize GPS interface");
+	return -1;
 }
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS

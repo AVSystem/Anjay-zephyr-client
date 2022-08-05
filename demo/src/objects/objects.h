@@ -37,6 +37,9 @@
 #define DISTANCE_NODE DT_ALIAS(distance)
 #define DISTANCE_AVAILABLE DT_NODE_HAS_STATUS(DISTANCE_NODE, okay)
 
+#define ILLUMINANCE_NODE DT_ALIAS(illuminance)
+#define ILLUMINANCE_AVAILABLE DT_NODE_HAS_STATUS(ILLUMINANCE_NODE, okay)
+
 void basic_sensors_install(anjay_t *anjay);
 void basic_sensors_update(anjay_t *anjay);
 

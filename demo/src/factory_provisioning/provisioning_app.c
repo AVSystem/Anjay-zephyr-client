@@ -56,7 +56,7 @@ static void factory_provision(void)
 
 	if (!anjay) {
 		LOG_ERR("Couldn't initialize Anjay. Rebooting.");
-		exit(1);
+		abort();
 	}
 
 	if (is_factory_provisioning_info_present()) {
@@ -87,7 +87,7 @@ static void factory_provision(void)
 
 		if (avs_is_err(err)) {
 			LOG_ERR("Could not perform factory provisioning. Rebooting.");
-			exit(1);
+			abort();
 		} else {
 			LOG_INF("Factory provisioning finished. "
 				"Please flash production firmware. Halting.");

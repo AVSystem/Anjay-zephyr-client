@@ -61,8 +61,8 @@ typedef int config_option_validate_t(const struct shell *shell, const char *valu
 
 struct anjay_client_app_config {
 #ifdef CONFIG_WIFI
-	char ssid[32];
-	char password[32];
+	char ssid[33];
+	char password[64];
 #endif // CONFIG_WIFI
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	char uri[128];

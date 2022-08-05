@@ -9,6 +9,7 @@ This folder contains LwM2M Client minimal application example for following targ
  - [disco_l475_iot1](https://docs.zephyrproject.org/latest/boards/arm/disco_l475_iot1/doc/index.html)
  - [nrf9160dk_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
  - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
+ - [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)
 
 The following LwM2M Objects are supported:
  - Security (/0)
@@ -36,6 +37,7 @@ west config manifest.file west-nrf.yml
 west update
 ```
 Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `west build -b thingy91_nrf9160_ns` in `minimal` directory, respectively.
+
 
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.

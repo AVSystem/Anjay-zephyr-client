@@ -1,5 +1,21 @@
 # Changelog
 
+## yy.mm (Mon dd{st/nd/rd/th}, yyyy)
+
+## 22.08.1 (Aug 31st, 2022)
+
+### Features
+- Added ESP32-DevKitC board support to `demo` and `minimal` examples
+- Experimental support for firmware update on the L475 board
+- Added GPS and assisted location to Thingy:91 and nRF9160dk targets as default
+- Turned off Thread Analyzer and TCP support by default.
+
+### Improvements
+- Deferred network initialization so that network settings can actually be changed if connection fails
+- Updated Anjay-zephyr to 3.1.2
+
+### Bugfixes
+
 ## 22.08 (Aug 5th, 2022)
 
 ### Features

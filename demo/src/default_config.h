@@ -16,7 +16,7 @@
 
 #pragma once
 
-#define CLIENT_VERSION "22.08"
+#define CLIENT_VERSION "22.08-75-gd102363"
 
 #ifdef CONFIG_WIFI
 #define WIFI_SSID "ssid"

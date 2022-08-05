@@ -41,6 +41,11 @@
 #ifdef CONFIG_WIFI_ESWIFI
 #include <wifi/eswifi/eswifi.h>
 #endif // CONFIG_WIFI_ESWIFI
+#ifdef CONFIG_WIFI_ESP32
+#include <esp_wifi.h>
+#include <esp_timer.h>
+#include <esp_event.h>
+#endif // CONFIG_WIFI_ESP32
 #include <net/wifi.h>
 #include <net/wifi_mgmt.h>
 #endif // CONFIG_WIFI
@@ -56,6 +61,7 @@
 #ifdef CONFIG_DATE_TIME
 #include <date_time.h>
 #endif // CONFIG_DATE_TIME
+
 
 LOG_MODULE_REGISTER(zephyr_demo);
 
@@ -151,6 +157,27 @@ void initialize_network(void)
 	}
 #endif // CONFIG_WIFI_ESWIFI
 
+#ifdef CONFIG_WIFI_ESP32
+	net_dhcpv4_start(iface);
+
+	AVS_STATIC_ASSERT(!IS_ENABLED(CONFIG_ESP32_WIFI_STA_AUTO),
+			  esp32_wifi_auto_mode_incompatible_with_project);
+	AVS_STATIC_ASSERT(sizeof(CONFIG_ANJAY_CLIENT_WIFI_SSID) <= 33, wifi_ssid_too_long);
+	AVS_STATIC_ASSERT(sizeof(CONFIG_ANJAY_CLIENT_WIFI_PASSWORD) <= 64, wifi_password_too_long);
+
+	wifi_config_t wifi_config = { 0 };
+
+	// use strncpy with the maximum length of sizeof(wifi_config.sta.{ssid|password}),
+	// because ESP32 Wi-Fi buffers don't have to be null-terminated
+	strncpy(wifi_config.sta.ssid, CONFIG_ANJAY_CLIENT_WIFI_SSID, sizeof(wifi_config.sta.ssid));
+	strncpy(wifi_config.sta.password, CONFIG_ANJAY_CLIENT_WIFI_PASSWORD,
+		sizeof(wifi_config.sta.password));
+
+	if (esp_wifi_set_mode(WIFI_MODE_STA) ||
+	    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) || esp_wifi_connect()) {
+		LOG_ERR("connection failed");
+	}
+#else // CONFIG_WIFI_ESP32
 	struct wifi_connect_req_params wifi_params = {
 		.ssid = (uint8_t *)CONFIG_ANJAY_CLIENT_WIFI_SSID,
 		.ssid_length = strlen(CONFIG_ANJAY_CLIENT_WIFI_SSID),
@@ -162,8 +189,9 @@ void initialize_network(void)
 	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
 		     sizeof(struct wifi_connect_req_params))) {
 		LOG_ERR("Failed to configure Wi-Fi");
-		exit(1);
+		abort();
 	}
+#endif // CONFIG_WIFI_ESP32
 
 	net_mgmt_event_wait_on_iface(iface, NET_EVENT_IPV4_ADDR_ADD, NULL, NULL, NULL, K_FOREVER);
 #endif // CONFIG_WIFI
@@ -173,7 +201,7 @@ void initialize_network(void)
 
 	if (ret < 0) {
 		LOG_ERR("LTE link could not be established.");
-		exit(1);
+		abort();
 	}
 #endif // CONFIG_LTE_LINK_CONTROL
 	LOG_INF("Connected to network");
@@ -193,7 +221,7 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 
 	if (!anjay) {
 		LOG_ERR("Could not create Anjay object");
-		exit(1);
+		abort();
 	}
 
 	// Install attr_storage and necessary objects

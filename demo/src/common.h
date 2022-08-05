@@ -49,3 +49,5 @@ avs_sched_clb_t cell_request_job;
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 avs_sched_clb_t agps_request_job;
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+
+void interrupt_net_connect_wait_loop(void);

@@ -45,19 +45,25 @@
 #include "status_led.h"
 #include "objects/objects.h"
 
-#ifdef CONFIG_WIFI
+#if defined(CONFIG_WIFI)
 #ifdef CONFIG_WIFI_ESWIFI
 #include <wifi/eswifi/eswifi.h>
 #endif // CONFIG_WIFI_ESWIFI
+#ifdef CONFIG_WIFI_ESP32
+#include <esp_wifi.h>
+#include <esp_timer.h>
+#include <esp_event.h>
+#endif // CONFIG_WIFI_ESP32
 #include <net/wifi.h>
 #include <net/wifi_mgmt.h>
-#else // CONFIG_WIFI
+#elif defined(CONFIG_LTE_LINK_CONTROL)
 #include <modem/lte_lc.h>
-#endif // CONFIG_WIFI
+#endif /* defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
+	*/
 
-#if defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) || defined(CONFIG_BOARD_THINGY91_NRF9160_NS)
+#ifdef CONFIG_DATE_TIME
 #include <date_time.h>
-#endif // defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) || defined(CONFIG_BOARD_THINGY91_NRF9160_NS)
+#endif // CONFIG_DATE_TIME
 
 #ifdef CONFIG_ANJAY_CLIENT_NRF_LC_INFO
 #include "nrf_lc_info.h"
@@ -101,7 +107,15 @@ K_THREAD_STACK_DEFINE(anjay_stack, ANJAY_THREAD_STACK_SIZE);
 static const char *PSK_QUERY = "1";
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 
-#ifdef CONFIG_BOARD_DISCO_L475_IOT1
+#ifdef CONFIG_DATE_TIME
+static void set_system_time(const struct sntp_time *time)
+{
+	const struct tm *current_time = gmtime(&time->seconds);
+
+	date_time_set(current_time);
+	date_time_update_async(NULL);
+}
+#else // CONFIG_DATE_TIME
 static void set_system_time(const struct sntp_time *time)
 {
 	struct timespec ts = { .tv_sec = time->seconds,
@@ -110,15 +124,7 @@ static void set_system_time(const struct sntp_time *time)
 		LOG_WRN("Failed to set time");
 	}
 }
-#else // CONFIG_BOARD_DISCO_L475_IOT1
-static void set_system_time(const struct sntp_time *time)
-{
-	const struct tm *current_time = gmtime(&time->seconds);
-
-	date_time_set(current_time);
-	date_time_update_async(NULL);
-}
-#endif // CONFIG_BOARD_DISCO_L475_IOT1
+#endif // CONFIG_DATE_TIME
 
 void synchronize_clock(void)
 {
@@ -296,10 +302,106 @@ static void release_objects(void)
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES
 }
 
-void initialize_network(void)
+static K_MUTEX_DEFINE(net_connect_mutex);
+static K_CONDVAR_DEFINE(net_connect_condvar);
+
+#if defined(CONFIG_WIFI)
+static volatile atomic_bool ip_addr_assigned;
+
+static void ip_addr_add_cb(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
+			   struct net_if *iface)
+{
+	(void)cb;
+	(void)mgmt_event;
+	(void)iface;
+
+	atomic_store(&ip_addr_assigned, true);
+	interrupt_net_connect_wait_loop();
+}
+
+static int wait_for_ip_addr_interruptible(void)
+{
+	// Note: this mirrors the logic of net_mgmt_event_wait_on_iface(), but there is
+	// a nasty bug in that net_mgmt_del_event_callback() is never called by that function.
+	struct net_mgmt_event_callback cb;
+	int ret = -EAGAIN;
+
+	memset(&cb, 0, sizeof(cb));
+	net_mgmt_init_event_callback(&cb, ip_addr_add_cb, NET_EVENT_IPV4_ADDR_ADD);
+	atomic_store(&ip_addr_assigned, false);
+	net_mgmt_add_event_callback(&cb);
+
+	SYNCHRONIZED(net_connect_mutex)
+	{
+		do {
+			k_condvar_wait(&net_connect_condvar, &net_connect_mutex, K_FOREVER);
+			if (atomic_load(&ip_addr_assigned)) {
+				ret = 0;
+			} else if (!atomic_load(&anjay_running)) {
+				ret = -ETIMEDOUT;
+			}
+		} while (ret == -EAGAIN);
+	}
+
+	net_mgmt_del_event_callback(&cb);
+
+	return ret;
+}
+#elif defined(CONFIG_LTE_LINK_CONTROL)
+static void lte_connect_handler(const struct lte_lc_evt *const evt)
+{
+	if (evt && evt->type == LTE_LC_EVT_NW_REG_STATUS &&
+	    (evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ||
+	     evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_ROAMING)) {
+		interrupt_net_connect_wait_loop();
+	}
+}
+
+static int lte_interruptible_connect(void)
+{
+	int ret = -1;
+	enum lte_lc_nw_reg_status status;
+
+	SYNCHRONIZED(net_connect_mutex)
+	{
+		// Note: this is supposed to be handled by lte_lc_connect_async(),
+		// but there is a nasty bug in in_progress flag handling
+		ret = lte_lc_nw_reg_status_get(&status);
+		if (!ret && status != LTE_LC_NW_REG_REGISTERED_HOME &&
+		    status != LTE_LC_NW_REG_REGISTERED_ROAMING) {
+			ret = lte_lc_connect_async(lte_connect_handler);
+			while (!ret) {
+				if (!atomic_load(&anjay_running)) {
+					ret = -ETIMEDOUT;
+				} else {
+					ret = lte_lc_nw_reg_status_get(&status);
+					if (!ret && (status == LTE_LC_NW_REG_REGISTERED_HOME ||
+						     status == LTE_LC_NW_REG_REGISTERED_ROAMING)) {
+						break;
+					}
+					k_condvar_wait(&net_connect_condvar, &net_connect_mutex,
+						       K_FOREVER);
+				}
+			}
+		}
+	}
+
+	return ret;
+}
+#endif // defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
+
+void interrupt_net_connect_wait_loop(void)
+{
+	SYNCHRONIZED(net_connect_mutex)
+	{
+		k_condvar_broadcast(&net_connect_condvar);
+	}
+}
+
+static int initialize_network(void)
 {
 	LOG_INF("Initializing network connection...");
-#ifdef CONFIG_WIFI
+#if defined(CONFIG_WIFI)
 	struct net_if *iface = net_if_get_default();
 
 #ifdef CONFIG_WIFI_ESWIFI
@@ -313,6 +415,25 @@ void initialize_network(void)
 	}
 #endif // CONFIG_WIFI_ESWIFI
 
+#ifdef CONFIG_WIFI_ESP32
+	net_dhcpv4_start(iface);
+
+	AVS_STATIC_ASSERT(!IS_ENABLED(CONFIG_ESP32_WIFI_STA_AUTO),
+			  esp32_wifi_auto_mode_incompatible_with_project);
+
+	wifi_config_t wifi_config = { 0 };
+
+	// use strncpy with the maximum length of sizeof(wifi_config.sta.{ssid|password}),
+	// because ESP32 Wi-Fi buffers don't have to be null-terminated
+	strncpy(wifi_config.sta.ssid, config_get_wifi_ssid(), sizeof(wifi_config.sta.ssid));
+	strncpy(wifi_config.sta.password, config_get_wifi_password(),
+		sizeof(wifi_config.sta.password));
+
+	if (esp_wifi_set_mode(WIFI_MODE_STA) ||
+	    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) || esp_wifi_connect()) {
+		LOG_ERR("connection failed");
+	}
+#else // CONFIG_WIFI_ESP32
 	struct wifi_connect_req_params wifi_params = { .ssid = (uint8_t *)config_get_wifi_ssid(),
 						       .ssid_length =
 							       strlen(config_get_wifi_ssid()),
@@ -321,24 +442,35 @@ void initialize_network(void)
 							       strlen(config_get_wifi_password()),
 						       .security = WIFI_SECURITY_TYPE_PSK };
 
-	if (net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
-		     sizeof(struct wifi_connect_req_params))) {
+	int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
+			   sizeof(struct wifi_connect_req_params));
+
+	if (ret && ret != -EALREADY && ret != -EINPROGRESS) {
 		LOG_ERR("Failed to configure Wi-Fi");
-		LOG_PANIC();
-		exit(1);
+		return -1;
+	}
+#endif // CONFIG_WIFI_ESP32
+
+	if (wait_for_ip_addr_interruptible()) {
+		LOG_ERR("Wi-Fi link could not be established.");
+		net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+		return -1;
+	}
+#elif defined(CONFIG_LTE_LINK_CONTROL)
+	int ret = lte_lc_init();
+
+	if (!ret) {
+		ret = lte_interruptible_connect();
 	}
 
-	net_mgmt_event_wait_on_iface(iface, NET_EVENT_IPV4_ADDR_ADD, NULL, NULL, NULL, K_FOREVER);
-#else // CONFIG_WIFI
-	int ret = lte_lc_init_and_connect();
-
-	if (ret < 0) {
+	if (ret < 0 && ret != -EALREADY && ret != -EINPROGRESS) {
 		LOG_ERR("LTE link could not be established.");
-		LOG_PANIC();
-		exit(1);
+		return -1;
 	}
-#endif // CONFIG_WIFI
+#endif /* defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
+	*/
 	LOG_INF("Connected to network");
+	return 0;
 }
 
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
@@ -409,6 +541,17 @@ static int configure_servers_from_config(anjay_t *anjay, const anjay_configurati
 
 static anjay_t *initialize_anjay(void)
 {
+	if (initialize_network()) {
+		LOG_ERR("Could not connect to the network");
+		return NULL;
+	}
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS
+	initialize_gps();
+#endif // CONFIG_ANJAY_CLIENT_GPS
+
+	synchronize_clock();
+
 	const anjay_configuration_t config = {
 #ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 		.endpoint_name = config_default_ep_name(),
@@ -560,11 +703,6 @@ void main(void)
 #endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
 	status_led_init();
-	initialize_network();
-
-#ifdef CONFIG_ANJAY_CLIENT_GPS
-	initialize_gps();
-#endif // CONFIG_ANJAY_CLIENT_GPS
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
 	fw_update_apply();
@@ -574,11 +712,9 @@ void main(void)
 	if (initialize_nrf_lc_info_listener()) {
 		LOG_ERR("Can't initialize Link Control info listener");
 		LOG_PANIC();
-		exit(1);
+		abort();
 	}
 #endif // CONFIG_ANJAY_CLIENT_NRF_LC_INFO
-
-	synchronize_clock();
 
 	atomic_store(&device_initialized, true);
 	atomic_store(&anjay_running, true);

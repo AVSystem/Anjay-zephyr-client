@@ -4,7 +4,7 @@ Project containing all implemented features, intended to be a showcase.
 ## Supported hardware and overview
 
 This folder contains LwM2M Client application example, which targets
-[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK) and [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91).
+[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91) and [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc).
 
 There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
 
@@ -12,12 +12,12 @@ It's possible to run the demo on other boards of your choice, by adding appropri
 
 The following LwM2M Objects are supported:
 
-| Target         | Objects                                                                                                                                                                     |
-|----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Common         | Security (/0)<br>Server (/1)<br>Device (/3)<br>Push button (/3347)                                                                                                          |
-| B-L475E-IOT01A | Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)                      |
-| nRF9160DK      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
-| Thingy:91      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
+| Target         | Objects                                                                                                                                                                                                                                                                                                                                                       |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Common         | Security (/0)<br>Server (/1)<br>Device (/3)                                                                                                                                                                                                                                                                                                                   |
+| B-L475E-IOT01A | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347)                                                                                                                                      |
+| nRF9160DK      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental)                                                                                                              |
+| Thingy:91      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
 
 ## Compilation
 
@@ -41,6 +41,7 @@ west update
 ```
 Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `west build -b thingy91_nrf9160_ns` in `demo` directory, respectively.
 
+
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.
 > ```
@@ -48,6 +49,7 @@ Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `w
 > west update
 > ```
 > [More about managing west workspace through manifests can be found here.](https://docs.zephyrproject.org/latest/guides/west/manifest.html)
+
 
 ### Compiling for external flash usage
 
@@ -84,6 +86,7 @@ Currently, our demo searches for aliases listed below (they map to appropriate L
 - `buzzer_pwm`
 - `push-button-[0-2]`
 - `switch-[0-2]`
+- `illuminance`
 
 Additionally, you can define `status-led` alias for a LED, which blinks when Anjay is running.
 
@@ -125,7 +128,12 @@ Subcommands:
 
 ## Upgrading the firmware over-the-air
 
-To upgrade the firmware, upload `build/zephyr/app_update.bin` file using standard means of LwM2M Firmware Update object.
+To upgrade the firmware, upload the proper image using standard means of LwM2M Firmware Update object.
+
+The image to use is:
+
+* for Nordic boards: `build/zephyr/app_update.bin`
+* for other boards: `build/zephyr/zephyr.signed.bin`
 
 ## Factory provisioning (experimental)
 

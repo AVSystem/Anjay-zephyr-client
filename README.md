@@ -8,12 +8,45 @@ This repository contains LwM2M Client samples based on open-source
 
 The following examples are present:
 
-| Directory      | Description                                                                                                                                            |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| demo/          | Showcase example implementing all features and sensors available on board. Supports experimental **factory provisioning** feature of Anjay 3.0. Supported boards:<br>[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>[nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>any other board of your choice (by adding appropriate `*.conf`/`*.overlay` files). FOTA support for selected boards.|
-| minimal/       | Minimalistic client samples which may serve as a base for specific application. Supported boards/targets:<br>[qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)<br>[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>[nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)|
-| ei_demo/       | An example containing motion recognition model, built with Edge Impulse. Supported boards/targets:<br>[Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)|
-
+<table>
+  <thead>
+    <tr>
+      <th>Directory</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>demo/</td>
+      <td>
+        Showcase example implementing all features and sensors available on board. Supports experimental <strong>factory provisioning</strong> feature of Anjay 3.0. Supported boards:<br>
+        [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>
+        [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
+        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
+        [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
+        any other board of your choice (by adding appropriate <code>*.conf</code>/<code>*.overlay</code> files). FOTA support for selected boards.
+      </td>
+    </tr>
+    <tr>
+      <td>minimal/</td>
+      <td>
+        Minimalistic client samples which may serve as a base for specific application. Supported boards/targets:<br>
+        [qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)<br>
+        [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>
+        [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
+        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
+        [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
+      </td>
+    </tr>
+    <tr>
+      <td>ei_demo/</td>
+      <td>
+        An example containing motion recognition model, built with Edge Impulse. Supported boards/targets:<br>
+        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 ## Getting started
 

@@ -60,6 +60,7 @@ static int cmd_anjay_stop(const struct shell *shell, size_t argc, char **argv)
 		// change the flag first to interrupt the thread if event loop is not
 		// running yet
 		atomic_store(&anjay_running, false);
+		interrupt_net_connect_wait_loop();
 
 		SYNCHRONIZED(global_anjay_mutex)
 		{

@@ -130,7 +130,7 @@ void initialize_network(void)
 #ifdef CONFIG_LTE_LINK_CONTROL
 	if (lte_lc_init_and_connect() < 0) {
 		LOG_ERR("LTE link could not be established.");
-		exit(1);
+		abort();
 	}
 #endif // CONFIG_LTE_LINK_CONTROL
 	LOG_INF("Connected to network");
@@ -150,7 +150,7 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 
 	if (!anjay) {
 		LOG_ERR("Could not create Anjay object");
-		exit(1);
+		abort();
 	}
 
 	// Install attr_storage and necessary objects

@@ -25,6 +25,19 @@
 
 LOG_MODULE_REGISTER(three_axis_sensors);
 
+struct sensor_sync_context {
+	/**
+	 * On some platform, access to buses like I2C is not inherently synchronized.
+	 * To allow accessing peripherals from multiple contexts (e.g. react to GPS
+	 * messages), we only access those buses through k_sys_work_q by convention.
+	 */
+	struct k_work work;
+	struct k_sem sem;
+	volatile double x;
+	volatile double y;
+	volatile double z;
+};
+
 struct sensor_context {
 	const char *name;
 	const char *unit;
@@ -32,6 +45,7 @@ struct sensor_context {
 	const struct device *device;
 	enum sensor_channel channel;
 	double scale_factor;
+	struct sensor_sync_context sync;
 };
 
 #define GAUSS_TO_TESLA_FACTOR 1e-4
@@ -61,22 +75,42 @@ static struct sensor_context three_axis_sensors_def[] = {
 #endif // GYROMETER_AVAILABLE
 };
 
-int three_axis_sensor_get_values(anjay_iid_t iid, void *_ctx, double *x_value, double *y_value,
-				 double *z_value)
+static void three_axis_sensor_work_handler(struct k_work *work)
 {
-	struct sensor_context *ctx = (struct sensor_context *)_ctx;
+	struct sensor_sync_context *sync_ctx = CONTAINER_OF(work, struct sensor_sync_context, work);
+	struct sensor_context *ctx = CONTAINER_OF(sync_ctx, struct sensor_context, sync);
 
 	struct sensor_value values[3];
 
 	if (sensor_sample_fetch_chan(ctx->device, ctx->channel) ||
 	    sensor_channel_get(ctx->device, ctx->channel, values)) {
-		LOG_ERR("Failed to read from %s", ctx->device->name);
-		return -1;
+		sync_ctx->x = NAN;
+		sync_ctx->y = NAN;
+		sync_ctx->z = NAN;
+	} else {
+		sync_ctx->x = sensor_value_to_double(&values[0]);
+		sync_ctx->y = sensor_value_to_double(&values[1]);
+		sync_ctx->z = sensor_value_to_double(&values[2]);
 	}
 
-	*x_value = sensor_value_to_double(&values[0]);
-	*y_value = sensor_value_to_double(&values[1]);
-	*z_value = sensor_value_to_double(&values[2]);
+	k_sem_give(&sync_ctx->sem);
+}
+
+int three_axis_sensor_get_values(anjay_iid_t iid, void *_ctx, double *x_value, double *y_value,
+				 double *z_value)
+{
+	struct sensor_context *ctx = (struct sensor_context *)_ctx;
+
+	k_work_submit(&ctx->sync.work);
+	k_sem_take(&ctx->sync.sem, K_FOREVER);
+
+	*x_value = ctx->sync.x;
+	*y_value = ctx->sync.y;
+	*z_value = ctx->sync.z;
+
+	if (isnan(*x_value) && isnan(*y_value) && isnan(*z_value)) {
+		return -1;
+	}
 
 	if (ctx->scale_factor) {
 		*x_value = (*x_value) * ctx->scale_factor;
@@ -87,12 +121,26 @@ int three_axis_sensor_get_values(anjay_iid_t iid, void *_ctx, double *x_value, d
 	return 0;
 }
 
+static int sensor_sync_context_init(struct sensor_sync_context *ctx)
+{
+	ctx->x = NAN;
+	ctx->y = NAN;
+	ctx->z = NAN;
+	k_work_init(&ctx->work, three_axis_sensor_work_handler);
+	return k_sem_init(&ctx->sem, 0, 1);
+}
+
 void three_axis_sensors_install(anjay_t *anjay)
 {
 	for (int i = 0; i < AVS_ARRAY_SIZE(three_axis_sensors_def); i++) {
 		struct sensor_context *ctx = &three_axis_sensors_def[i];
 
 		if (!device_is_ready(ctx->device)) {
+			LOG_WRN("Object: %s could not be installed", ctx->name);
+			continue;
+		}
+
+		if (sensor_sync_context_init(&ctx->sync)) {
 			LOG_WRN("Object: %s could not be installed", ctx->name);
 			continue;
 		}
