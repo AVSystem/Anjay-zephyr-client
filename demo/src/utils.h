@@ -18,8 +18,10 @@
 
 #include <stddef.h>
 
+#include <zephyr/net/sntp.h>
+
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
-#include <dfu/mcuboot.h>
+#include <zephyr/dfu/mcuboot.h>
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
 struct device_id {
@@ -41,3 +43,7 @@ int get_fw_version_image_1(char *out_buf, size_t buf_size);
 #if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
 int tls_session_cache_purge(void);
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+
+#ifdef CONFIG_NET_IPV6
+int sntp_simple_ipv6(const char *server, uint32_t timeout, struct sntp_time *time);
+#endif // CONFIG_NET_IPV6

@@ -17,10 +17,11 @@
 #include <stdatomic.h>
 #include <string.h>
 
-#include <logging/log.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
-#include <zephyr.h>
 
 #include "common.h"
 #include "nrf_lc_info.h"
@@ -98,7 +99,8 @@ static void lte_lc_evt_handler(const struct lte_lc_evt *const evt)
 static void periodic_search_work_handler(struct k_work *work)
 {
 	// TODO: consider using other search types, which work on nRF9160's with FW 1.3.1 and up
-	int err = lte_lc_neighbor_cell_measurement(LTE_LC_NEIGHBOR_SEARCH_TYPE_DEFAULT);
+	int err = lte_lc_neighbor_cell_measurement(&(struct lte_lc_ncellmeas_params){
+		.search_type = LTE_LC_NEIGHBOR_SEARCH_TYPE_DEFAULT });
 
 	if (err) {
 		LOG_ERR("Can't search for neighbor cells, error: %d", err);

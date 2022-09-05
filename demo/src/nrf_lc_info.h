@@ -19,7 +19,8 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
+
 #include <modem/lte_lc.h>
 #include <modem/modem_info.h>
 

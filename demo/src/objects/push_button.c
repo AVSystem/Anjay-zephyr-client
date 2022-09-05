@@ -23,9 +23,10 @@
 #include <avsystem/commons/avs_list.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <devicetree.h>
-#include <drivers/gpio.h>
-#include <logging/log.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include "objects.h"
 
@@ -57,6 +58,9 @@ static struct push_button_instance_glue button_glue[] = {
 #if PUSH_BUTTON_AVAILABLE(2)
 	PUSH_BUTTON_GLUE_ITEM(2),
 #endif // PUSH_BUTTON_AVAILABLE(2)
+#if PUSH_BUTTON_AVAILABLE(3)
+	PUSH_BUTTON_GLUE_ITEM(3),
+#endif // PUSH_BUTTON_AVAILABLE(3)
 };
 
 #define BUTTON_CHANGE_WORKS_NUM 256
@@ -97,8 +101,7 @@ static void button_state_changed(const struct device *dev, struct gpio_callback 
 			work->reserved = true;
 			work->anjay = glue->anjay;
 			work->state = (bool)gpio_pin_get(dev, glue->gpio_pin);
-			work->iid = (anjay_iid_t)(((size_t)(glue - button_glue)) /
-						  sizeof(struct push_button_instance_glue));
+			work->iid = (anjay_iid_t)((size_t)(glue - button_glue));
 
 			k_work_init(&work->work, button_change_state_handler);
 

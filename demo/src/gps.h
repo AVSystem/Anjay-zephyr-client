@@ -16,8 +16,10 @@
 
 #pragma once
 
-#include <zephyr.h>
+#include <stdatomic.h>
 #include <stdbool.h>
+
+#include <zephyr/kernel.h>
 
 #ifdef CONFIG_ANJAY_CLIENT_GPS
 struct gps_data {
@@ -48,5 +50,9 @@ int initialize_gps(void);
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 uint32_t gps_fetch_modem_agps_request_mask(void);
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS_NRF
+extern volatile atomic_bool gps_prio_mode;
+#endif // CONFIG_ANJAY_CLIENT_GPS_NRF
 
 #endif // CONFIG_ANJAY_CLIENT_GPS

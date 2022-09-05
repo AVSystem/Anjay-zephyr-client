@@ -21,7 +21,8 @@
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <zephyr.h>
+#include <zephyr/kernel.h>
+
 #include <modem/lte_lc.h>
 
 #include "objects.h"

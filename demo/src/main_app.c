@@ -14,17 +14,19 @@
  * limitations under the License.
  */
 
-#include <devicetree.h>
-#include <kernel.h>
 #include <stdlib.h>
-#include <sys/printk.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
+
 #include <version.h>
 
-#include <net/dns_resolve.h>
-#include <net/sntp.h>
-#include <posix/time.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/sys/printk.h>
+
+#include <zephyr/net/dns_resolve.h>
+#include <zephyr/net/sntp.h>
+#include <zephyr/posix/time.h>
 
 #include <anjay/anjay.h>
 #include <anjay/access_control.h>
@@ -43,23 +45,9 @@
 #include "utils.h"
 #include "persistence.h"
 #include "status_led.h"
-#include "objects/objects.h"
 
-#if defined(CONFIG_WIFI)
-#ifdef CONFIG_WIFI_ESWIFI
-#include <wifi/eswifi/eswifi.h>
-#endif // CONFIG_WIFI_ESWIFI
-#ifdef CONFIG_WIFI_ESP32
-#include <esp_wifi.h>
-#include <esp_timer.h>
-#include <esp_event.h>
-#endif // CONFIG_WIFI_ESP32
-#include <net/wifi.h>
-#include <net/wifi_mgmt.h>
-#elif defined(CONFIG_LTE_LINK_CONTROL)
-#include <modem/lte_lc.h>
-#endif /* defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
-	*/
+#include "network/network.h"
+#include "objects/objects.h"
 
 #ifdef CONFIG_DATE_TIME
 #include <date_time.h>
@@ -68,6 +56,10 @@
 #ifdef CONFIG_ANJAY_CLIENT_NRF_LC_INFO
 #include "nrf_lc_info.h"
 #endif // CONFIG_ANJAY_CLIENT_NRF_LC_INFO
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+#define RETRY_SYNC_CLOCK_DELAY_TIME_S 1
+#endif // CONFIG_NET_L2_OPENTHREAD
 
 LOG_MODULE_REGISTER(main_app);
 static const anjay_dm_object_def_t **buzzer_obj;
@@ -99,13 +91,25 @@ K_MUTEX_DEFINE(anjay_thread_running_mutex);
 K_CONDVAR_DEFINE(anjay_thread_running_condvar);
 K_THREAD_STACK_DEFINE(anjay_stack, ANJAY_THREAD_STACK_SIZE);
 
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#ifdef CONFIG_NET_L2_OPENTHREAD
+static struct k_work_delayable sync_clock_work;
+#endif // CONFIG_NET_L2_OPENTHREAD
+
+static bool anjay_online;
+static enum network_bearer_t anjay_last_known_bearer;
+
+static K_SEM_DEFINE(synchronize_clock_sem, 0, 1);
+
+#if defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&                    \
+	defined(CONFIG_MODEM_KEY_MGMT)
 // The only parameters needed to address a credential stored in the modem
 // are its type and its security tag - the type is defined already by
 // the proper function being called, so the query contains only a single
 // integer - the desired security tag.
 static const char *PSK_QUERY = "1";
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#endif /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+	* defined(CONFIG_MODEM_KEY_MGMT)
+	*/
 
 #ifdef CONFIG_DATE_TIME
 static void set_system_time(const struct sntp_time *time)
@@ -131,12 +135,30 @@ void synchronize_clock(void)
 	struct sntp_time time;
 	const uint32_t timeout_ms = 5000;
 
-	if (sntp_simple(NTP_SERVER, timeout_ms, &time)) {
-		LOG_WRN("Failed to get current time");
-	} else {
+	if (false
+#if defined(CONFIG_NET_IPV6)
+	    || !sntp_simple_ipv6(NTP_SERVER, timeout_ms, &time)
+#endif
+#if defined(CONFIG_NET_IPV4)
+	    || !sntp_simple(NTP_SERVER, timeout_ms, &time)
+#endif
+	) {
 		set_system_time(&time);
+		k_sem_give(&synchronize_clock_sem);
+	} else {
+		LOG_WRN("Failed to get current time");
+#ifdef CONFIG_NET_L2_OPENTHREAD
+		k_work_schedule(&sync_clock_work, K_SECONDS(RETRY_SYNC_CLOCK_DELAY_TIME_S));
+#endif // CONFIG_NET_L2_OPENTHREAD
 	}
 }
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+static void retry_synchronize_clock_work_handler(struct k_work *work)
+{
+	synchronize_clock();
+}
+#endif // CONFIG_NET_L2_OPENTHREAD
 
 static int register_objects(anjay_t *anjay)
 {
@@ -302,183 +324,13 @@ static void release_objects(void)
 #endif // CONFIG_ANJAY_CLIENT_LOCATION_SERVICES
 }
 
-static K_MUTEX_DEFINE(net_connect_mutex);
-static K_CONDVAR_DEFINE(net_connect_condvar);
-
-#if defined(CONFIG_WIFI)
-static volatile atomic_bool ip_addr_assigned;
-
-static void ip_addr_add_cb(struct net_mgmt_event_callback *cb, uint32_t mgmt_event,
-			   struct net_if *iface)
-{
-	(void)cb;
-	(void)mgmt_event;
-	(void)iface;
-
-	atomic_store(&ip_addr_assigned, true);
-	interrupt_net_connect_wait_loop();
-}
-
-static int wait_for_ip_addr_interruptible(void)
-{
-	// Note: this mirrors the logic of net_mgmt_event_wait_on_iface(), but there is
-	// a nasty bug in that net_mgmt_del_event_callback() is never called by that function.
-	struct net_mgmt_event_callback cb;
-	int ret = -EAGAIN;
-
-	memset(&cb, 0, sizeof(cb));
-	net_mgmt_init_event_callback(&cb, ip_addr_add_cb, NET_EVENT_IPV4_ADDR_ADD);
-	atomic_store(&ip_addr_assigned, false);
-	net_mgmt_add_event_callback(&cb);
-
-	SYNCHRONIZED(net_connect_mutex)
-	{
-		do {
-			k_condvar_wait(&net_connect_condvar, &net_connect_mutex, K_FOREVER);
-			if (atomic_load(&ip_addr_assigned)) {
-				ret = 0;
-			} else if (!atomic_load(&anjay_running)) {
-				ret = -ETIMEDOUT;
-			}
-		} while (ret == -EAGAIN);
-	}
-
-	net_mgmt_del_event_callback(&cb);
-
-	return ret;
-}
-#elif defined(CONFIG_LTE_LINK_CONTROL)
-static void lte_connect_handler(const struct lte_lc_evt *const evt)
-{
-	if (evt && evt->type == LTE_LC_EVT_NW_REG_STATUS &&
-	    (evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_HOME ||
-	     evt->nw_reg_status == LTE_LC_NW_REG_REGISTERED_ROAMING)) {
-		interrupt_net_connect_wait_loop();
-	}
-}
-
-static int lte_interruptible_connect(void)
-{
-	int ret = -1;
-	enum lte_lc_nw_reg_status status;
-
-	SYNCHRONIZED(net_connect_mutex)
-	{
-		// Note: this is supposed to be handled by lte_lc_connect_async(),
-		// but there is a nasty bug in in_progress flag handling
-		ret = lte_lc_nw_reg_status_get(&status);
-		if (!ret && status != LTE_LC_NW_REG_REGISTERED_HOME &&
-		    status != LTE_LC_NW_REG_REGISTERED_ROAMING) {
-			ret = lte_lc_connect_async(lte_connect_handler);
-			while (!ret) {
-				if (!atomic_load(&anjay_running)) {
-					ret = -ETIMEDOUT;
-				} else {
-					ret = lte_lc_nw_reg_status_get(&status);
-					if (!ret && (status == LTE_LC_NW_REG_REGISTERED_HOME ||
-						     status == LTE_LC_NW_REG_REGISTERED_ROAMING)) {
-						break;
-					}
-					k_condvar_wait(&net_connect_condvar, &net_connect_mutex,
-						       K_FOREVER);
-				}
-			}
-		}
-	}
-
-	return ret;
-}
-#endif // defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
-
-void interrupt_net_connect_wait_loop(void)
-{
-	SYNCHRONIZED(net_connect_mutex)
-	{
-		k_condvar_broadcast(&net_connect_condvar);
-	}
-}
-
-static int initialize_network(void)
-{
-	LOG_INF("Initializing network connection...");
-#if defined(CONFIG_WIFI)
-	struct net_if *iface = net_if_get_default();
-
-#ifdef CONFIG_WIFI_ESWIFI
-	struct eswifi_dev *eswifi = eswifi_by_iface_idx(0);
-
-	assert(eswifi);
-	// Set regulatory domain to "World Wide (passive Ch12-14)"; eS-WiFi defaults
-	// to "US" which prevents connecting to networks that use channels 12-14.
-	if (eswifi_at_cmd(eswifi, "CN=XV\r") < 0) {
-		LOG_WRN("Failed to set Wi-Fi regulatory domain");
-	}
-#endif // CONFIG_WIFI_ESWIFI
-
-#ifdef CONFIG_WIFI_ESP32
-	net_dhcpv4_start(iface);
-
-	AVS_STATIC_ASSERT(!IS_ENABLED(CONFIG_ESP32_WIFI_STA_AUTO),
-			  esp32_wifi_auto_mode_incompatible_with_project);
-
-	wifi_config_t wifi_config = { 0 };
-
-	// use strncpy with the maximum length of sizeof(wifi_config.sta.{ssid|password}),
-	// because ESP32 Wi-Fi buffers don't have to be null-terminated
-	strncpy(wifi_config.sta.ssid, config_get_wifi_ssid(), sizeof(wifi_config.sta.ssid));
-	strncpy(wifi_config.sta.password, config_get_wifi_password(),
-		sizeof(wifi_config.sta.password));
-
-	if (esp_wifi_set_mode(WIFI_MODE_STA) ||
-	    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) || esp_wifi_connect()) {
-		LOG_ERR("connection failed");
-	}
-#else // CONFIG_WIFI_ESP32
-	struct wifi_connect_req_params wifi_params = { .ssid = (uint8_t *)config_get_wifi_ssid(),
-						       .ssid_length =
-							       strlen(config_get_wifi_ssid()),
-						       .psk = (uint8_t *)config_get_wifi_password(),
-						       .psk_length =
-							       strlen(config_get_wifi_password()),
-						       .security = WIFI_SECURITY_TYPE_PSK };
-
-	int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &wifi_params,
-			   sizeof(struct wifi_connect_req_params));
-
-	if (ret && ret != -EALREADY && ret != -EINPROGRESS) {
-		LOG_ERR("Failed to configure Wi-Fi");
-		return -1;
-	}
-#endif // CONFIG_WIFI_ESP32
-
-	if (wait_for_ip_addr_interruptible()) {
-		LOG_ERR("Wi-Fi link could not be established.");
-		net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
-		return -1;
-	}
-#elif defined(CONFIG_LTE_LINK_CONTROL)
-	int ret = lte_lc_init();
-
-	if (!ret) {
-		ret = lte_interruptible_connect();
-	}
-
-	if (ret < 0 && ret != -EALREADY && ret != -EINPROGRESS) {
-		LOG_ERR("LTE link could not be established.");
-		return -1;
-	}
-#endif /* defined(CONFIG_WIFI) || defined(CONFIG_LTE_LINK_CONTROL)
-	*/
-	LOG_INF("Connected to network");
-	return 0;
-}
-
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 static int configure_servers_from_config(anjay_t *anjay, const anjay_configuration_t *config)
 {
 	const bool bootstrap = config_is_bootstrap();
 
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#if defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&                    \
+	defined(CONFIG_MODEM_KEY_MGMT)
 	const char *psk_key = config_get_psk();
 	avs_crypto_psk_key_info_t psk_key_info =
 		avs_crypto_psk_key_info_from_buffer(psk_key, strlen(psk_key));
@@ -492,23 +344,30 @@ static int configure_servers_from_config(anjay_t *anjay, const anjay_configurati
 		LOG_ERR("Storing PSK identity failed");
 		return -1;
 	}
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#endif /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+	* defined(CONFIG_MODEM_KEY_MGMT)
+	*/
 
 	const anjay_security_instance_t security_instance = {
 		.ssid = 1,
 		.bootstrap_server = bootstrap,
 		.server_uri = config_get_server_uri(),
 		.security_mode = ANJAY_SECURITY_PSK,
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#if defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&                    \
+	defined(CONFIG_MODEM_KEY_MGMT)
 		.psk_identity = avs_crypto_psk_identity_info_from_engine(PSK_QUERY),
 		.psk_key = avs_crypto_psk_key_info_from_engine(PSK_QUERY),
-#else // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#else /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+       * defined(CONFIG_MODEM_KEY_MGMT)
+       */
 		.public_cert_or_psk_identity = config->endpoint_name,
 		.public_cert_or_psk_identity_size =
 			strlen(security_instance.public_cert_or_psk_identity),
 		.private_cert_or_psk_key = config_get_psk(),
 		.private_cert_or_psk_key_size = strlen(security_instance.private_cert_or_psk_key)
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#endif /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+	* defined(CONFIG_MODEM_KEY_MGMT)
+	*/
 	};
 
 	const anjay_server_instance_t server_instance = { .ssid = 1,
@@ -541,17 +400,6 @@ static int configure_servers_from_config(anjay_t *anjay, const anjay_configurati
 
 static anjay_t *initialize_anjay(void)
 {
-	if (initialize_network()) {
-		LOG_ERR("Could not connect to the network");
-		return NULL;
-	}
-
-#ifdef CONFIG_ANJAY_CLIENT_GPS
-	initialize_gps();
-#endif // CONFIG_ANJAY_CLIENT_GPS
-
-	synchronize_clock();
-
 	const anjay_configuration_t config = {
 #ifdef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 		.endpoint_name = config_default_ep_name(),
@@ -617,17 +465,67 @@ static anjay_t *initialize_anjay(void)
 #endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 
 error:
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#if defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&                    \
+	defined(CONFIG_MODEM_KEY_MGMT)
 	if (avs_is_err(avs_crypto_psk_engine_key_rm(PSK_QUERY))) {
 		LOG_WRN("Removing PSK key failed");
 	}
 	if (avs_is_err(avs_crypto_psk_engine_identity_rm(PSK_QUERY))) {
 		LOG_WRN("Removing PSK identity failed");
 	}
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#endif /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+	* defined(CONFIG_MODEM_KEY_MGMT)
+	*/
 	anjay_delete(anjay);
 	release_objects();
 	return NULL;
+}
+
+static void update_anjay_network_bearer_unlocked(anjay_t *anjay, enum network_bearer_t bearer)
+{
+	if (anjay_online && !network_bearer_valid(bearer)) {
+		LOG_INF("Anjay is now offline");
+		if (!anjay_transport_enter_offline(anjay, ANJAY_TRANSPORT_SET_ALL)) {
+			anjay_online = false;
+		}
+	} else if (network_bearer_valid(bearer) &&
+		   (!anjay_online || anjay_last_known_bearer != bearer)) {
+		LOG_INF("Anjay is now online on bearer %d", (int)bearer);
+		if (anjay_last_known_bearer != bearer) {
+			if (!anjay_transport_schedule_reconnect(anjay, ANJAY_TRANSPORT_SET_ALL)) {
+				anjay_last_known_bearer = bearer;
+				anjay_online = true;
+			}
+		} else if (!anjay_transport_exit_offline(anjay, ANJAY_TRANSPORT_SET_ALL)) {
+			anjay_online = true;
+		}
+	}
+}
+
+static void update_anjay_network_bearer_job(avs_sched_t *sched, const void *dummy)
+{
+	ARG_UNUSED(dummy);
+
+	SYNCHRONIZED(global_anjay_mutex)
+	{
+		if (global_anjay) {
+			update_anjay_network_bearer_unlocked(global_anjay,
+							     network_current_bearer());
+		}
+	}
+}
+
+void sched_update_anjay_network_bearer(void)
+{
+	static avs_sched_handle_t job_handle;
+
+	SYNCHRONIZED(global_anjay_mutex)
+	{
+		if (global_anjay) {
+			AVS_SCHED_NOW(anjay_get_scheduler(global_anjay), &job_handle,
+				      update_anjay_network_bearer_job, NULL, 0);
+		}
+	}
 }
 
 void run_anjay(void *arg1, void *arg2, void *arg3)
@@ -636,53 +534,86 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 	ARG_UNUSED(arg2);
 	ARG_UNUSED(arg3);
 
-	anjay_t *anjay = initialize_anjay();
+	LOG_INF("Connecting to the network...");
 
-	if (anjay) {
-		LOG_INF("Successfully created thread");
-
-		SYNCHRONIZED(global_anjay_mutex)
-		{
-			global_anjay = anjay;
-		}
-
-		// anjay stop could be called immediately after anjay start
-		if (atomic_load(&anjay_running)) {
-			update_objects(anjay_get_scheduler(anjay), &anjay);
-			anjay_event_loop_run_with_error_handling(
-				anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
-		}
-
-		avs_sched_del(&update_objects_handle);
-#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
-		if (config_is_use_persistence() && persist_anjay_if_required(anjay)) {
-			LOG_ERR("Couldn't persist Anjay's state!");
-		}
-#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
-
-		SYNCHRONIZED(global_anjay_mutex)
-		{
-			global_anjay = NULL;
-		}
-		anjay_delete(anjay);
-		release_objects();
-
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
-		if (avs_is_err(avs_crypto_psk_engine_key_rm(PSK_QUERY))) {
-			LOG_WRN("Removing PSK key failed");
-		}
-		if (avs_is_err(avs_crypto_psk_engine_identity_rm(PSK_QUERY))) {
-			LOG_WRN("Removing PSK identity failed");
-		}
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
-
-#ifdef CONFIG_ANJAY_CLIENT_FOTA
-		if (fw_update_requested()) {
-			fw_update_reboot();
-		}
-#endif // CONFIG_ANJAY_CLIENT_FOTA
+	if (network_connect_async()) {
+		LOG_ERR("Could not initiate connection");
+		goto finish;
 	}
 
+	if (network_wait_for_connected_interruptible()) {
+		LOG_ERR("Could not connect to the network");
+		goto disconnect;
+	}
+
+	LOG_INF("Connected to network");
+
+	k_sem_reset(&synchronize_clock_sem);
+	synchronize_clock();
+	if (k_sem_take(&synchronize_clock_sem, K_SECONDS(30))) {
+		LOG_WRN("Could not synchronize system clock within timeout, "
+			"continuing without real time...");
+	}
+
+	anjay_t *anjay = initialize_anjay();
+
+	if (!anjay) {
+		goto disconnect;
+	}
+
+	LOG_INF("Successfully created thread");
+
+	SYNCHRONIZED(global_anjay_mutex)
+	{
+		global_anjay = anjay;
+
+		anjay_last_known_bearer = (enum network_bearer_t)0;
+		update_anjay_network_bearer_unlocked(anjay, network_current_bearer());
+	}
+
+	// anjay stop could be called immediately after anjay start
+	if (atomic_load(&anjay_running)) {
+		update_objects(anjay_get_scheduler(anjay), &anjay);
+		anjay_event_loop_run_with_error_handling(
+			anjay, avs_time_duration_from_scalar(1, AVS_TIME_S));
+	}
+
+	avs_sched_del(&update_objects_handle);
+#ifdef CONFIG_ANJAY_CLIENT_PERSISTENCE
+	if (config_is_use_persistence() && persist_anjay_if_required(anjay)) {
+		LOG_ERR("Couldn't persist Anjay's state!");
+	}
+#endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
+
+	SYNCHRONIZED(global_anjay_mutex)
+	{
+		global_anjay = NULL;
+	}
+	anjay_delete(anjay);
+	release_objects();
+
+#if defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&                    \
+	defined(CONFIG_MODEM_KEY_MGMT)
+	if (avs_is_err(avs_crypto_psk_engine_key_rm(PSK_QUERY))) {
+		LOG_WRN("Removing PSK key failed");
+	}
+	if (avs_is_err(avs_crypto_psk_engine_identity_rm(PSK_QUERY))) {
+		LOG_WRN("Removing PSK identity failed");
+	}
+#endif /* defined(CONFIG_ANJAY_COMPAT_ZEPHYR_TLS) && defined(CONFIG_NRF_MODEM_LIB) &&
+	* defined(CONFIG_MODEM_KEY_MGMT)
+	*/
+
+#ifdef CONFIG_ANJAY_CLIENT_FOTA
+	if (fw_update_requested()) {
+		fw_update_reboot();
+	}
+#endif // CONFIG_ANJAY_CLIENT_FOTA
+
+disconnect:
+	network_disconnect();
+
+finish:
 	SYNCHRONIZED(anjay_thread_running_mutex)
 	{
 		anjay_thread_running = false;
@@ -692,6 +623,8 @@ void run_anjay(void *arg1, void *arg2, void *arg3)
 
 void main(void)
 {
+	LOG_INF("Initializing Anjay-zephyr-client demo " CLIENT_VERSION);
+
 #ifdef WITH_ANJAY_CLIENT_CONFIG
 	config_init(shell_backend_uart_get_ptr());
 #endif // WITH_ANJAY_CLIENT_CONFIG
@@ -703,6 +636,20 @@ void main(void)
 #endif // CONFIG_ANJAY_CLIENT_PERSISTENCE
 
 	status_led_init();
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+	k_work_init_delayable(&sync_clock_work, retry_synchronize_clock_work_handler);
+#endif // CONFIG_NET_L2_OPENTHREAD
+
+	if (network_initialize()) {
+		LOG_ERR("Cannot initialize the network");
+		LOG_PANIC();
+		abort();
+	}
+
+#ifdef CONFIG_ANJAY_CLIENT_GPS
+	initialize_gps();
+#endif // CONFIG_ANJAY_CLIENT_GPS
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
 	fw_update_apply();

@@ -87,6 +87,12 @@ config ANJAY_CLIENT_NRF_LC_INFO_CELL_POLL_RATE
 	range 1 2147483647
 	depends on ANJAY_CLIENT_NRF_LC_INFO
 
+config ANJAY_CLIENT_NETWORK_KEEPALIVE_RATE
+	int "Rate of checking whether the network connection is still alive [seconds]"
+	default 60
+	range 1 2147483647
+	depends on WIFI_ESWIFI
+
 config ANJAY_CLIENT_FOTA
 	bool "Enable the Firmware Update object"
 	depends on BOOTLOADER_MCUBOOT

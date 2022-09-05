@@ -17,9 +17,10 @@
 #pragma once
 
 #include <anjay/dm.h>
-#include <device.h>
-#include <devicetree.h>
-#include <sys/util.h>
+
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/util.h>
 
 #ifdef CONFIG_ANJAY_CLIENT_NRF_LC_INFO
 #include "../nrf_lc_info.h"
@@ -58,7 +59,8 @@ void three_axis_sensors_update(anjay_t *anjay);
 #define PUSH_BUTTON_NODE(idx) DT_ALIAS(push_button_##idx)
 #define PUSH_BUTTON_AVAILABLE(idx) DT_NODE_HAS_STATUS(PUSH_BUTTON_NODE(idx), okay)
 #define PUSH_BUTTON_AVAILABLE_ANY                                                                  \
-	(PUSH_BUTTON_AVAILABLE(0) || PUSH_BUTTON_AVAILABLE(1) || PUSH_BUTTON_AVAILABLE(2))
+	(PUSH_BUTTON_AVAILABLE(0) || PUSH_BUTTON_AVAILABLE(1) || PUSH_BUTTON_AVAILABLE(2) ||       \
+	 PUSH_BUTTON_AVAILABLE(3))
 int push_button_object_install(anjay_t *anjay);
 
 #define SWITCH_NODE(idx) DT_ALIAS(switch_##idx)

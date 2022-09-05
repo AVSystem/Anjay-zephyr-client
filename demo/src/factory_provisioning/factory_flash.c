@@ -18,17 +18,18 @@
 #include <errno.h>
 #include <string.h>
 
-#include <fs/fs.h>
-#include <fs/fs_sys.h>
-#include <fs_mgmt/fs_mgmt.h>
+#include <zephyr/fs/fs.h>
+#include <zephyr/fs/fs_sys.h>
+#include <zephyr/kernel.h>
 
-#include <kernel.h>
+#include <fs_mgmt/fs_mgmt.h>
 
 #include <avsystem/commons/avs_errno_map.h>
 #include <avsystem/commons/avs_stream_v_table.h>
 #include <avsystem/commons/avs_utils.h>
 
 #include "factory_flash.h"
+#include "../config.h"
 
 /*
  * THE PROCESS FOR FLASHING FACTORY PROVISIONING INFORMATION
@@ -54,7 +55,7 @@
  *
  * What happens under the hood during steps 3 and 4:
  *
- * 1. run_anjay() in main.c calls factory_flash_input_stream_create(). This
+ * 1. run_anjay() in main.c calls factory_flash_input_stream_init(). This
  *    initializes the fake "provision_fs" file system and mounts it at /factory.
  * 2. mcumgr starts writing the /factory/provision.cbor file. This will call:
  *    - provision_fs_stat() - that will error out; mcumgr code only does this
@@ -96,7 +97,6 @@ static enum {
 	FACTORY_FLASH_FINISHED
 } factory_flash_state;
 static char factory_flash_result[AVS_INT_STR_BUF_SIZE(int)];
-static size_t factory_flash_result_offset;
 
 static K_MUTEX_DEFINE(factory_flash_mutex);
 static K_CONDVAR_DEFINE(factory_flash_condvar);
@@ -104,66 +104,79 @@ static K_CONDVAR_DEFINE(factory_flash_condvar);
 #define PROVISION_FS_TYPE FS_TYPE_EXTERNAL_BASE
 
 #define PROVISION_FS_MOUNT_POINT "/factory"
-#define PROVISION_FS_FLASH_FILE PROVISION_FS_MOUNT_POINT "/provision.cbor"
-#define PROVISION_FS_RESULT_FILE PROVISION_FS_MOUNT_POINT "/result.txt"
+
+enum provision_fs_files { FLASH_FILE, RESULT_FILE, EP_FILE };
+
+static struct provision_fs_file_info {
+	const char *const name;
+	const uint8_t *value;
+	size_t size;
+	size_t offset;
+} files[] = {
+	[FLASH_FILE] = { .name = PROVISION_FS_MOUNT_POINT "/provision.cbor" },
+	[RESULT_FILE] = { .name = PROVISION_FS_MOUNT_POINT "/result.txt" },
+	[EP_FILE] = { .name = PROVISION_FS_MOUNT_POINT "/endpoint.txt" },
+};
 
 // 15 seconds of inactivity is treated as EOF
 #define PROVISION_FS_UPLOAD_TIMEOUT_MS 15000
 
 static int provision_fs_open(struct fs_file_t *filp, const char *fs_path, fs_mode_t flags)
 {
-	(void)filp;
-	(void)fs_path;
-	(void)flags;
-	if (strcmp(fs_path, PROVISION_FS_FLASH_FILE) == 0) {
+	if (strcmp(fs_path, files[FLASH_FILE].name) == 0) {
 		if ((flags & (FS_O_READ | FS_O_WRITE)) == FS_O_WRITE &&
 		    factory_flash_state == FACTORY_FLASH_INITIAL) {
+			filp->filep = &files[FLASH_FILE];
 			return 0;
 		}
-	} else if (strcmp(fs_path, PROVISION_FS_RESULT_FILE) == 0) {
+	} else if (strcmp(fs_path, files[RESULT_FILE].name) == 0) {
 		if ((flags & (FS_O_READ | FS_O_WRITE)) == FS_O_READ) {
-			if (factory_flash_state < FACTORY_FLASH_FINISHED) {
-				factory_flash_state = FACTORY_FLASH_EOF;
-				k_condvar_broadcast(&factory_flash_condvar);
-			}
+			filp->filep = &files[RESULT_FILE];
+			return 0;
+		}
+	} else if (strcmp(fs_path, files[EP_FILE].name) == 0) {
+		if ((flags & (FS_O_READ | FS_O_WRITE)) == FS_O_READ) {
+			filp->filep = &files[EP_FILE];
 			return 0;
 		}
 	}
+
 	return -ENOENT;
 }
 
 static ssize_t provision_fs_read(struct fs_file_t *filp, void *dest, size_t nbytes)
 {
-	// Read provisioning result
-	(void)filp;
+	if (!filp->filep) {
+		return -EBADF;
+	}
+
 	ssize_t result = k_mutex_lock(&factory_flash_mutex, K_FOREVER);
 
 	if (result) {
 		return result;
 	}
 
-	while (factory_flash_state != FACTORY_FLASH_FINISHED) {
-		k_condvar_wait(&factory_flash_condvar, &factory_flash_mutex, K_FOREVER);
+	if (filp->filep == &files[RESULT_FILE] || filp->filep == &files[EP_FILE]) {
+		struct provision_fs_file_info *file_info = filp->filep;
+		const uint8_t *src = file_info->value + file_info->offset;
+		size_t bytes_to_copy = AVS_MIN(file_info->size - file_info->offset, nbytes);
+
+		memcpy(dest, src, bytes_to_copy);
+
+		file_info->offset += bytes_to_copy;
+		result = bytes_to_copy;
+	} else {
+		result = -EBADF;
 	}
-
-	size_t bytes_to_copy = strlen(factory_flash_result) - factory_flash_result_offset;
-
-	if (nbytes < bytes_to_copy) {
-		bytes_to_copy = nbytes;
-	}
-
-	memcpy((char *)dest, factory_flash_result + factory_flash_result_offset, bytes_to_copy);
 
 	k_mutex_unlock(&factory_flash_mutex);
 
-	return bytes_to_copy;
+	return result;
 }
 
 static ssize_t provision_fs_write(struct fs_file_t *filp, const void *src, size_t nbytes)
 {
-	// Write the actual provisioning data
-	(void)filp;
-	if (factory_flash_state != FACTORY_FLASH_INITIAL) {
+	if (factory_flash_state != FACTORY_FLASH_INITIAL || filp->filep != &files[FLASH_FILE]) {
 		return -EBADF;
 	}
 
@@ -209,19 +222,18 @@ static ssize_t provision_fs_write(struct fs_file_t *filp, const void *src, size_
 
 static int provision_fs_lseek(struct fs_file_t *filp, off_t off, int whence)
 {
-	(void)filp;
-	(void)off;
-	(void)whence;
 	assert(whence == FS_SEEK_SET);
 	if (filp->flags & FS_O_WRITE) {
 		// The provisioning file
 		assert(off == (size_t)received_data_total);
 	} else {
 		// The status file
-		if (off > strlen(factory_flash_result)) {
+		struct provision_fs_file_info *file_info = filp->filep;
+
+		if (off > file_info->size) {
 			return -ENXIO;
 		}
-		factory_flash_result_offset = off;
+		file_info->offset = off;
 	}
 	return 0;
 }
@@ -242,16 +254,22 @@ static int provision_fs_unlink(struct fs_mount_t *mountp, const char *name)
 static int provision_fs_stat(struct fs_mount_t *mountp, const char *path, struct fs_dirent *entry)
 {
 	(void)mountp;
-	(void)path;
 	(void)entry;
-	if (strcmp(path, PROVISION_FS_RESULT_FILE) != 0) {
+
+	if (strcmp(path, files[RESULT_FILE].name) != 0 && strcmp(path, files[EP_FILE].name) != 0) {
 		return -ENOENT;
 	}
 
 	int result = k_mutex_lock(&factory_flash_mutex, K_FOREVER);
 
-	if (!result) {
-		if (factory_flash_state == FACTORY_FLASH_INITIAL) {
+	if (result) {
+		return result;
+	}
+
+	struct provision_fs_file_info *file_info;
+
+	if (strcmp(path, files[RESULT_FILE].name) == 0) {
+		if (factory_flash_state < FACTORY_FLASH_FINISHED) {
 			factory_flash_state = FACTORY_FLASH_EOF;
 			k_condvar_broadcast(&factory_flash_condvar);
 		}
@@ -260,13 +278,21 @@ static int provision_fs_stat(struct fs_mount_t *mountp, const char *path, struct
 			k_condvar_wait(&factory_flash_condvar, &factory_flash_mutex, K_FOREVER);
 		}
 
-		entry->type = FS_DIR_ENTRY_FILE;
-		entry->size = strlen(factory_flash_result);
-
-		k_mutex_unlock(&factory_flash_mutex);
+		file_info = &files[RESULT_FILE];
+		file_info->value = factory_flash_result;
+	} else {
+		file_info = &files[EP_FILE];
+		file_info->value = config_default_ep_name();
 	}
 
-	return result;
+	file_info->size = strlen(file_info->value);
+
+	entry->size = file_info->size;
+	entry->type = FS_DIR_ENTRY_FILE;
+
+	k_mutex_unlock(&factory_flash_mutex);
+
+	return 0;
 }
 
 static const struct fs_file_system_t provision_fs = { .open = provision_fs_open,
@@ -336,7 +362,7 @@ static struct {
 	const avs_stream_v_table_t *const vtable;
 } provision_stream = { .vtable = &provision_stream_vtable };
 
-avs_stream_t *factory_flash_input_stream_create(void)
+avs_stream_t *factory_flash_input_stream_init(void)
 {
 	if (fs_register(PROVISION_FS_TYPE, &provision_fs) || fs_mount(&provision_fs_mount_point)) {
 		return NULL;

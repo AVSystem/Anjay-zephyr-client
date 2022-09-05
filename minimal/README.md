@@ -10,6 +10,7 @@ This folder contains LwM2M Client minimal application example for following targ
  - [nrf9160dk_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
  - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
  - [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)
+ - [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html)
 
 The following LwM2M Objects are supported:
  - Security (/0)
@@ -27,7 +28,7 @@ west update
 
 You can now compile the project using `west build -b <target>` in `minimal` directory.
 
-### Compilation guide for nRF9160DK and Thingy:91
+### Compilation guide for nRF9160DK, Thingy:91 and nRF52840DK
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/minimal`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -36,7 +37,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns` or `west build -b thingy91_nrf9160_ns` in `minimal` directory, respectively.
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns` or `west build -b nrf52840dk_nrf52840` in `minimal` directory, respectively. The last command compiles project for use with the OpenThread network, more about this can be found in the section `Connecting to the LwM2M Server with OpenThread`.
 
 
 > **__NOTE:__**
@@ -99,8 +100,18 @@ LwM2M Server, please register at https://eu.iot.avsystem.cloud/. Then have
 a look at the Configuration menu using `west build -t guiconfig` or `west build -t menuconfig` to configure security credentials and other
 necessary settings (like Wi-Fi SSID etc.).
 
-[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/Coiote_DM_Device_Onboarding/Quick_start/)
+[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/IoT_quick_start/Device_onboarding/)
 is available on IoT Developer Zone.
 
 NOTE: You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI
 can be changed in the Configuration menu.
+
+## Connecting to the LwM2M Server with OpenThread
+
+To use this project on the nRF52840dk board, in addition to the configuration shown in the previous paragraph, you will need to configure the OpenThread Border Router and Commissioner as described in the guides from the links below.
+You can change default `CONFIG_OPENTHREAD_JOINER_PSKD` value in the `boards/nrf52840dk_nrf52840.conf`. In same file, replace `CONFIG_OPENTHREAD_MTD=y` with `CONFIG_OPENTHREAD_FTD=y` if you want your device to run as an FTD.
+
+Resources:
+- [Introduction to OpenThread](https://openthread.io/guides)
+- [Border Router guide](https://openthread.io/guides/border-router)
+- [Commissioner guide](https://openthread.io/guides/commissioner)

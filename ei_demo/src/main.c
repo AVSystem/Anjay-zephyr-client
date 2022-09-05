@@ -14,16 +14,19 @@
  * limitations under the License.
  */
 
-#include <devicetree.h>
 #include <stdlib.h>
-#include <sys/printk.h>
-#include <logging/log.h>
+
 #include <version.h>
 
-#include <net/dns_resolve.h>
-#include <net/sntp.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
+
+#include <zephyr/net/dns_resolve.h>
+#include <zephyr/net/sntp.h>
+
 #ifdef CONFIG_POSIX_API
-#include <posix/time.h>
+#include <zephyr/posix/time.h>
 #else // CONFIG_POSIX_API
 #include <date_time.h>
 #endif // CONFIG_POSIX_API
@@ -36,10 +39,11 @@
 #include <anjay/attr_storage.h>
 #include <anjay/security.h>
 #include <anjay/server.h>
-#include <net/net_conn_mgr.h>
-#include <net/net_core.h>
-#include <net/net_event.h>
-#include <net/net_mgmt.h>
+
+#include <zephyr/net/net_conn_mgr.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/net_event.h>
+#include <zephyr/net/net_mgmt.h>
 
 #include <avsystem/commons/avs_prng.h>
 

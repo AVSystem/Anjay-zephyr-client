@@ -138,7 +138,7 @@ LwM2M Server, please register at https://eu.iot.avsystem.cloud/. Then have
 a look at the example configuration to configure security credentials and other
 necessary settings (like Wi-Fi SSID etc.).
 
-[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/Coiote_DM_Device_Onboarding/Quick_start/)
+[Guide showing basic usage of Coiote DM](https://iotdevzone.avsystem.com/docs/IoT_quick_start/Device_onboarding/)
 is available on IoT Developer Zone.
 
 > **__NOTE:__**

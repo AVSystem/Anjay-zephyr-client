@@ -32,9 +32,9 @@
 #include <avsystem/commons/avs_list.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <drivers/sensor.h>
-#include <logging/log.h>
-#include <zephyr.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/kernel.h>
 
 #include "../led.h"
 #include "objects.h"

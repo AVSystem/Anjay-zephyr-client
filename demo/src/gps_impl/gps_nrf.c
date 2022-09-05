@@ -18,15 +18,16 @@
 #error "This GPS implementation is not supported by selected board"
 #endif // !(defined(CONFIG_BOARD_NRF9160DK_NRF9160_NS) || defined(CONFIG_BOARD_THINGY91_NRF9160_NS))
 
-#include <kernel.h>
-#include <logging/log.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/timeutil.h>
+
 #include <nrf_modem_at.h>
 #include <nrf_modem_gnss.h>
-#include <sys/timeutil.h>
-#include <zephyr.h>
 
 #include "../common.h"
 #include "../config.h"
+#include "../network/network_internal.h"
 #include "../gps.h"
 #include "../utils.h"
 
@@ -57,6 +58,10 @@ static const char *const init_at_commands[] = {
 #else // CONFIG_ANJAY_CLIENT_GPS_NRF_EXTERNAL_ANTENNA
 	"AT%XCOEX0=1,1,1565,1586",
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_EXTERNAL_ANTENNA
+
+	// https://infocenter.nordicsemi.com/topic/ref_at_commands/REF/at_commands/mob_termination_ctrl_status/cfun_set.html
+	// 31 - Activates GNSS without changing LTE.
+	"AT+CFUN=31",
 };
 
 K_MUTEX_DEFINE(gps_read_last_mtx);
@@ -76,6 +81,8 @@ static void prio_mode_disable_dwork_handler(struct k_work *work);
 K_WORK_DEFINE(incoming_pvt_work, incoming_pvt_work_handler);
 K_WORK_DELAYABLE_DEFINE(prio_mode_disable_dwork, prio_mode_disable_dwork_handler);
 
+volatile atomic_bool gps_prio_mode;
+
 static int64_t gnss_datetime_to_timestamp(const struct nrf_modem_gnss_datetime *datetime)
 {
 	struct tm broken_down = { .tm_year = datetime->year - 1900,
@@ -92,12 +99,8 @@ void prio_mode_disable(void)
 {
 	LOG_INF("Disabling gnss_prio_mode");
 
-	SYNCHRONIZED(global_anjay_mutex)
-	{
-		if (global_anjay) {
-			anjay_transport_exit_offline(global_anjay, ANJAY_TRANSPORT_SET_IP);
-		}
-	}
+	atomic_store(&gps_prio_mode, false);
+	network_internal_connection_state_changed();
 
 	if (nrf_modem_gnss_prio_mode_disable()) {
 		LOG_ERR("Couldn't disable gnss_prio_mode");
@@ -161,13 +164,8 @@ static void incoming_pvt_work_handler(struct k_work *work)
 				return;
 			}
 
-			SYNCHRONIZED(global_anjay_mutex)
-			{
-				if (global_anjay) {
-					anjay_transport_enter_offline(global_anjay,
-								      ANJAY_TRANSPORT_SET_IP);
-				}
-			}
+			atomic_store(&gps_prio_mode, true);
+			network_internal_connection_state_changed();
 
 			k_work_schedule(&prio_mode_disable_dwork, K_SECONDS(gps_prio_mode_timeout));
 		}

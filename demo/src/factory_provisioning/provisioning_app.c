@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
-#include <shell/shell_uart.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/shell/shell_uart.h>
 
 #include <anjay/anjay.h>
 #include <anjay/access_control.h>
@@ -63,35 +63,24 @@ static void factory_provision(void)
 		LOG_INF("Factory provisioning information already present. "
 			"Please flash production firmware. Halting.");
 	} else {
+		LOG_WRN("NOTE: No more log messages will be displayed. Please use "
+			"mcumgr to check provisioning results");
+
+		LOG_INF("Device ready for provisioning.");
+
 		z_shell_log_backend_disable(shell_backend_uart_get_ptr()->log_backend);
 
-		avs_stream_t *stream = factory_flash_input_stream_create();
+		avs_stream_t *stream = factory_flash_input_stream_init();
 
 		assert(stream);
 
 		avs_error_t err = anjay_factory_provision(anjay, stream);
-		avs_error_t cleanup_err = avs_stream_cleanup(&stream);
+		// NOTE: Not calling avs_stream_cleanup() because stream is *NOT* heap-allocated
 
-		if (avs_is_ok(err)) {
-			err = cleanup_err;
-		}
 		if (avs_is_ok(err) && persist_factory_provisioning_info(anjay)) {
 			err = avs_errno(AVS_EIO);
 		}
 		factory_flash_finished(avs_is_ok(err) ? 0 : -1);
-
-		z_shell_log_backend_enable(shell_backend_uart_get_ptr()->log_backend,
-					   (struct shell *)(uintptr_t)shell_backend_uart_get_ptr(),
-					   AVS_MIN(CONFIG_SHELL_BACKEND_SERIAL_LOG_LEVEL,
-						   CONFIG_LOG_MAX_LEVEL));
-
-		if (avs_is_err(err)) {
-			LOG_ERR("Could not perform factory provisioning. Rebooting.");
-			abort();
-		} else {
-			LOG_INF("Factory provisioning finished. "
-				"Please flash production firmware. Halting.");
-		}
 	}
 
 	while (true) {

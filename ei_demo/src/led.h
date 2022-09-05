@@ -18,8 +18,8 @@
 
 #include <stdint.h>
 
-#include <device.h>
-#include <devicetree.h>
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
 
 #define LED_NODE(n) DT_ALIAS(led##n)
 #define LED_AVAILABLE(n) DT_NODE_HAS_STATUS(LED_NODE(n), okay)

@@ -19,6 +19,8 @@
 #include "utils.h"
 #include "persistence.h"
 
+#include "network/network.h"
+
 static int cmd_anjay_start(const struct shell *shell, size_t argc, char **argv)
 {
 	ARG_UNUSED(argc);
@@ -60,7 +62,7 @@ static int cmd_anjay_stop(const struct shell *shell, size_t argc, char **argv)
 		// change the flag first to interrupt the thread if event loop is not
 		// running yet
 		atomic_store(&anjay_running, false);
-		interrupt_net_connect_wait_loop();
+		network_interrupt_connect_wait_loop();
 
 		SYNCHRONIZED(global_anjay_mutex)
 		{
@@ -104,6 +106,7 @@ static int cmd_anjay_config_set(const struct shell *shell, size_t argc, char **a
 
 	return config_set_option(shell, argc, argv);
 }
+
 
 static int cmd_anjay_config_default(const struct shell *shell, size_t argc, char **argv)
 {
@@ -234,7 +237,8 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 #endif // CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 #ifdef CONFIG_WIFI
 	SHELL_CMD(OPTION_KEY_SSID, NULL, "Wi-Fi SSID", cmd_anjay_config_set),
-	SHELL_CMD(OPTION_KEY_PASSWORD, NULL, "Wi-Fi password", cmd_anjay_config_set),
+	SHELL_CMD(OPTION_KEY_PASSWORD, NULL, "Wi-Fi password (empty for no-sec)",
+		  cmd_anjay_config_set),
 #endif // CONFIG_WIFI
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 	SHELL_CMD(OPTION_KEY_URI, NULL, "Server URI", cmd_anjay_config_set),

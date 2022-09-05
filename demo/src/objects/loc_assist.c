@@ -15,7 +15,8 @@
  */
 #include <assert.h>
 #include <stdbool.h>
-#include <logging/log.h>
+
+#include <zephyr/logging/log.h>
 
 #include <anjay/anjay.h>
 #include <anjay/lwm2m_send.h>

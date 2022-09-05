@@ -16,7 +16,7 @@
 
 #include <stdbool.h>
 
-#include <drivers/gpio.h>
+#include <zephyr/drivers/gpio.h>
 
 #include "led.h"
 

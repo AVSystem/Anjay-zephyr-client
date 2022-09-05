@@ -18,5 +18,5 @@
 
 #include <avsystem/commons/avs_stream.h>
 
-avs_stream_t *factory_flash_input_stream_create(void);
+avs_stream_t *factory_flash_input_stream_init(void);
 void factory_flash_finished(int result);

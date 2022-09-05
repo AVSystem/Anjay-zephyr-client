@@ -1,6 +1,23 @@
 # Changelog
 
-## yy.mm (Mon dd{st/nd/rd/th}, yyyy)
+## 22.12 (Dec 13th, 2022)
+
+### Features
+- Added provisioning script for `demo` examples
+- Added nRF52840dk_nRF52840 with OpenThread support
+- Added automatic handling of connection link state
+- Added option for use of non-secure WiFi networks
+- Added configuration for software-based security on nRF9160DK
+
+### Improvements
+- Updated Zephyr to 3.2.0
+- Updated sdk-nrf to 2.1.1
+- Refactored network connection handling
+- Firmware update success status can be now persisted across reboots until actual delivery
+
+### Bugfixes
+- Fixed critical memory corruption bug in the factory provisioning app
+- Fixed problem with push buttons IID
 
 ## 22.08.1 (Aug 31st, 2022)
 

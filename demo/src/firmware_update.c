@@ -17,16 +17,20 @@
 
 #include <stdbool.h>
 
-#include <dfu/flash_img.h>
-#include <dfu/mcuboot.h>
-#include <logging/log.h>
-#include <logging/log_ctrl.h>
-#include <sys/reboot.h>
+#include <zephyr/dfu/flash_img.h>
+#include <zephyr/dfu/mcuboot.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
+#include <zephyr/settings/settings.h>
+#include <zephyr/sys/reboot.h>
 
 #include "firmware_update.h"
 #include "utils.h"
 
 LOG_MODULE_REGISTER(fw_update);
+
+#define SETTINGS_ROOT_NAME "anjay_fw_update"
+#define SETTINGS_APP_JUST_UPDATED_KEY "app_just_updated"
 
 static bool just_updated;
 static bool update_requested;
@@ -70,12 +74,10 @@ static int fw_stream_finish(void *user_ptr)
 
 	assert(img_ctx_initialized);
 
-	if (flash_img_buffered_write(&img_ctx, NULL, 0, true)) {
-		return -1;
-	}
+	int result = flash_img_buffered_write(&img_ctx, NULL, 0, true) ? -1 : 0;
 
 	img_ctx_initialized = false;
-	return 0;
+	return result;
 }
 
 static void fw_reset(void *user_ptr)
@@ -126,11 +128,61 @@ int fw_update_install(anjay_t *anjay)
 		state.result = ANJAY_FW_UPDATE_INITIAL_SUCCESS;
 	}
 
-	return anjay_fw_update_install(anjay, &handlers, anjay, &state);
+	int result = anjay_fw_update_install(anjay, &handlers, anjay, &state);
+
+	if (!result && just_updated) {
+		if (settings_delete(SETTINGS_ROOT_NAME "/" SETTINGS_APP_JUST_UPDATED_KEY)) {
+			LOG_ERR("Couldn't delete the just_updated flag");
+		}
+
+		just_updated = false;
+	}
+
+	return result;
 }
+
+static int fw_settings_set(const char *key, size_t len, settings_read_cb read_cb, void *cb_arg)
+{
+	if (strcmp(key, SETTINGS_APP_JUST_UPDATED_KEY) != 0) {
+		return -ENOENT;
+	}
+
+	if (len > 1) {
+		return -EINVAL;
+	}
+
+	char value = 0;
+
+	int result = read_cb(cb_arg, &value, len);
+
+	if (result < 0) {
+		return result;
+	}
+
+	if (value != 0) {
+		just_updated = true;
+	}
+
+	return 0;
+}
+
+SETTINGS_STATIC_HANDLER_DEFINE(anjay_fw_update, SETTINGS_ROOT_NAME, NULL, fw_settings_set, NULL,
+			       NULL);
 
 void fw_update_apply(void)
 {
+	int settings_state = settings_subsys_init();
+
+	if (settings_state) {
+		LOG_ERR("Couldn't init settings subsystem");
+	} else {
+		settings_load_subtree(SETTINGS_ROOT_NAME);
+	}
+
+	if (just_updated) {
+		LOG_INF("Undelivered previous firmware update success");
+	}
+
 	// Image may be unconfirmed, because:
 	// - we've just did a FOTA of the device and new
 	//   firmware is being run
@@ -144,9 +196,17 @@ void fw_update_apply(void)
 	//
 	// We can differentiate these two situations by taking
 	// the retval of boot_write_img_confirmed().
-	just_updated = !boot_is_img_confirmed() && !boot_write_img_confirmed();
-	if (just_updated) {
+	if (!boot_is_img_confirmed() && !boot_write_img_confirmed()) {
 		LOG_INF("Successfully updated firmware");
+
+		if (!just_updated) {
+			just_updated = true;
+
+			if (settings_save_one(SETTINGS_ROOT_NAME "/" SETTINGS_APP_JUST_UPDATED_KEY,
+					      "1", 1)) {
+				LOG_ERR("Couldn't save the just_updated flag");
+			}
+		}
 	}
 }
 

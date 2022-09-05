@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <devicetree.h>
+#include <zephyr/devicetree.h>
 
 #define STATUS_LED_NODE DT_ALIAS(status_led)
 #define STATUS_LED_AVAILABLE DT_NODE_HAS_STATUS(STATUS_LED_NODE, okay)

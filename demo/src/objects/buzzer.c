@@ -22,9 +22,9 @@
 #include <avsystem/commons/avs_list.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <devicetree.h>
-#include <drivers/pwm.h>
-#include <zephyr.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/pwm.h>
+#include <zephyr/kernel.h>
 
 #include "../utils.h"
 #include "objects.h"

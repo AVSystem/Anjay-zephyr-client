@@ -21,8 +21,8 @@
 #include <avsystem/commons/avs_defs.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <sys/reboot.h>
-#include <zephyr.h>
+#include <zephyr/sys/reboot.h>
+#include <zephyr/kernel.h>
 
 #include "../utils.h"
 

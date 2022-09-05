@@ -18,7 +18,7 @@
 
 #include <string.h>
 
-#include <drivers/hwinfo.h>
+#include <zephyr/drivers/hwinfo.h>
 
 #include <avsystem/commons/avs_utils.h>
 

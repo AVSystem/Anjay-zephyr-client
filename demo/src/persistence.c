@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include <zephyr.h>
-#include <logging/log.h>
-#include <settings/settings.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/settings/settings.h>
 
 #include <anjay/core.h>
 #include <anjay/access_control.h>

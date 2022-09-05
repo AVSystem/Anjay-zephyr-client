@@ -16,13 +16,16 @@
 
 #pragma once
 
-#define CLIENT_VERSION "22.08-75-gd102363"
+#include "config.h"
+
+#define CLIENT_VERSION "22.12"
 
 #ifdef CONFIG_WIFI
 #define WIFI_SSID "ssid"
 
 #define WIFI_PASSWORD "password"
 #endif // CONFIG_WIFI
+
 
 #define SERVER_URI "coaps://eu.iot.avsystem.cloud:5684"
 

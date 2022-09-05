@@ -68,9 +68,15 @@ elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
     # Kconfig variables, which are populated by find_package(Zephyr).
     # That's why we do it ourselves here...
     set(MERGED_HEX_NAME "${CMAKE_CURRENT_BINARY_DIR}/zephyr/merged.hex")
+    # In Zephyr 3.2, mergehex.py has been moved
+    # from scripts/mergehex.py to scripts/build/mergehex.py
+    set(MERGEHEX_SCRIPT "${ZEPHYR_BASE}/scripts/build/mergehex.py")
+    if(NOT EXISTS "${MERGEHEX_SCRIPT}")
+        set(MERGEHEX_SCRIPT "${ZEPHYR_BASE}/scripts/mergehex.py")
+    endif()
     add_custom_command(OUTPUT "${MERGED_HEX_NAME}"
                        COMMAND "${PYTHON_EXECUTABLE}"
-                               "${ZEPHYR_BASE}/scripts/mergehex.py"
+                               "${MERGEHEX_SCRIPT}"
                                -o "${MERGED_HEX_NAME}"
                                "${CMAKE_CURRENT_BINARY_DIR}/mcuboot/zephyr/zephyr.hex"
                                "${CMAKE_CURRENT_BINARY_DIR}/zephyr/zephyr.signed.hex"
@@ -110,6 +116,9 @@ else()
         src/status_led.h
         src/utils.c
         src/utils.h
+        src/network/network.c
+        src/network/network.h
+        src/network/network_internal.h
         src/objects/basic_sensors.c
         src/objects/buzzer.c
         src/objects/device.c
@@ -147,12 +156,31 @@ else()
         list(APPEND app_sources
              src/firmware_update.c)
     endif()
+
+    if(CONFIG_LTE_LINK_CONTROL)
+        list(APPEND app_sources
+             src/network/network_nrf91.c)
+    elseif(CONFIG_NET_L2_OPENTHREAD)
+        list(APPEND app_sources
+             src/network/network_openthread.c)
+    elseif(CONFIG_WIFI_ESP32)
+        list(APPEND app_sources
+             src/network/network_esp32.c)
+    elseif(CONFIG_WIFI_ESWIFI)
+        list(APPEND app_sources
+             src/network/network_eswifi.c)
+    elseif(CONFIG_WIFI)
+        list(APPEND app_sources
+             src/network/network_wifi.c)
+    else()
+        message(FATAL_ERROR "Neither CONFIG_LTE_LINK_CONTROL nor CONFIG_WIFI is enabled")
+    endif()
 endif()
 
 target_sources(app PRIVATE
                ${app_sources})
 
-if(CONF_FILE_BUILD_TYPE STREQUAL "extflash" AND CONFIG_BOOTLOADER_MCUBOOT)
+if(CONF_FILE_BUILD_TYPE MATCHES ".*extflash.*" AND CONFIG_BOOTLOADER_MCUBOOT)
     # This is a workaround for a bug in nCS' integration with TF-M.
     #
     # When MCUboot and TF-M are both in use, the CONFIG_BOOTLOADER_MCUBOOT

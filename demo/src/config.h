@@ -18,7 +18,13 @@
 
 #include <stdint.h>
 
-#include <shell/shell.h>
+#include <zephyr/shell/shell.h>
+
+#ifdef CONFIG_WIFI
+#include <zephyr/net/wifi_mgmt.h>
+#endif // CONFIG_WIFI
+
+#include "network/network.h"
 
 #ifdef CONFIG_WIFI
 #define OPTION_KEY_SSID wifi_ssid
@@ -48,6 +54,7 @@
 	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 	*/
 
+
 const char *config_default_ep_name(void);
 
 #ifdef WITH_ANJAY_CLIENT_CONFIG
@@ -67,9 +74,10 @@ const char *config_get_endpoint_name(void);
 
 #ifdef CONFIG_WIFI
 const char *config_get_wifi_ssid(void);
-
 const char *config_get_wifi_password(void);
+struct wifi_connect_req_params config_get_wifi_params(void);
 #endif // CONFIG_WIFI
+
 
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 const char *config_get_server_uri(void);

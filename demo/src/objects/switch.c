@@ -22,8 +22,8 @@
 #include <avsystem/commons/avs_list.h>
 #include <avsystem/commons/avs_memory.h>
 
-#include <devicetree.h>
-#include <drivers/gpio.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
 
 #include "objects.h"
 

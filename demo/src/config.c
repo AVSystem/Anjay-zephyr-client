@@ -19,16 +19,16 @@
 #include <avsystem/commons/avs_time.h>
 #include <avsystem/commons/avs_utils.h>
 
-#include <device.h>
-#include <shell/shell.h>
-#include <shell/shell_uart.h>
-#include <zephyr.h>
+#include <zephyr/device.h>
+#include <zephyr/kernel.h>
+#include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
 
-#include <console/console.h>
-#include <drivers/flash.h>
-#include <drivers/hwinfo.h>
-#include <drivers/uart.h>
-#include <settings/settings.h>
+#include <zephyr/console/console.h>
+#include <zephyr/drivers/flash.h>
+#include <zephyr/drivers/hwinfo.h>
+#include <zephyr/drivers/uart.h>
+#include <zephyr/settings/settings.h>
 
 #include "config.h"
 #include "default_config.h"
@@ -142,12 +142,15 @@ static int settings_set(const char *key, size_t len, settings_read_cb read_cb, v
 	if (key) {
 		for (int i = 0; i < AVS_ARRAY_SIZE(string_options); ++i) {
 			if (strcmp(key, string_options[i].key) == 0) {
-				if (len != string_options[i].value_capacity) {
+				if (len > string_options[i].value_capacity) {
 					return -EINVAL;
 				}
 
-				int result = read_cb(cb_arg, string_options[i].value,
-						     string_options[i].value_capacity);
+				memset(string_options[i].value, 0,
+				       string_options[i].value_capacity);
+
+				int result = read_cb(cb_arg, string_options[i].value, len);
+
 				return result >= 0 ? 0 : result;
 			}
 		}
@@ -167,6 +170,10 @@ void config_print_summary(const struct shell *shell)
 
 void config_save(const struct shell *shell)
 {
+	// This is a POSIX extension provided by newlib, but only visible with
+	// #define _POSIX_C_SOURCE 200809L. That conflicts with some declarations in Zephyr, though.
+	size_t strnlen(const char *s, size_t maxlen);
+
 	char key_buf[64];
 	int result = 0;
 
@@ -174,8 +181,13 @@ void config_save(const struct shell *shell)
 		result = avs_simple_snprintf(key_buf, sizeof(key_buf), SETTINGS_ROOT_NAME "/%s",
 					     string_options[i].key);
 		if (result >= 0) {
-			result = settings_save_one(key_buf, string_options[i].value,
-						   string_options[i].value_capacity);
+			size_t length =
+				strnlen(string_options[i].value, string_options[i].value_capacity);
+			// Allow for storing empty strings '\0'
+			if (length == 0) {
+				length = 1;
+			}
+			result = settings_save_one(key_buf, string_options[i].value, length);
 		}
 	}
 
@@ -242,32 +254,34 @@ void config_init(const struct shell *shell)
 
 int config_set_option(const struct shell *shell, size_t argc, char **argv)
 {
-	if (argc != 2) {
-		shell_error(shell, "Wrong number of arguments.\n");
+	const char *key = argv[0];
+	const char *value = "";
+	struct anjay_client_option *option = NULL;
+
+	if (argc == 2) {
+		value = argv[1];
+	} else if (argc > 2 || argc == 0) {
+		shell_warn(shell, "Wrong argument number");
+		return -1;
+	}
+	for (size_t i = 0; i < AVS_ARRAY_SIZE(string_options); ++i) {
+		if (strcmp(key, string_options[i].key) == 0) {
+			option = &string_options[i];
+			break;
+		}
+	}
+	assert(option);
+
+	size_t value_len = strlen(value) + 1;
+
+	assert(option->validator);
+	if (option->validator(shell, value, value_len, option)) {
 		return -1;
 	}
 
-	const char *key = argv[0];
+	memcpy(option->value, value, value_len);
 
-	for (size_t i = 0; i < AVS_ARRAY_SIZE(string_options); ++i) {
-		if (strcmp(key, string_options[i].key) == 0) {
-			const char *value = argv[1];
-			size_t value_len = strlen(value) + 1;
-
-			assert(string_options[i].validator);
-			if (string_options[i].validator(shell, value, value_len,
-							&string_options[i])) {
-				return -1;
-			}
-
-			memcpy(string_options[i].value, value, value_len);
-
-			return 0;
-		}
-	}
-
-	AVS_UNREACHABLE("Invalid option key");
-	return -1;
+	return 0;
 }
 #endif // WITH_ANJAY_CLIENT_CONFIG
 
@@ -277,6 +291,7 @@ static int parse_uint32(const char *value, uint32_t *out)
 	return sscanf(value, "%" PRIu32, out) == 1 ? 0 : -1;
 }
 #endif // defined(CONFIG_ANJAY_CLIENT_GPS_NRF) || !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
+
 
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 const char *config_get_endpoint_name(void)
@@ -295,7 +310,25 @@ const char *config_get_wifi_password(void)
 {
 	return app_config.password;
 }
+
+struct wifi_connect_req_params config_get_wifi_params(void)
+{
+	struct wifi_connect_req_params result = { 0 };
+
+	result.ssid = (uint8_t *)config_get_wifi_ssid();
+	result.ssid_length = strlen((const char *)result.ssid);
+	result.psk = (uint8_t *)config_get_wifi_password();
+	result.psk_length = strlen((const char *)result.psk);
+	if (result.psk_length) {
+		result.security = WIFI_SECURITY_TYPE_PSK;
+	} else {
+		result.security = WIFI_SECURITY_TYPE_NONE;
+	}
+
+	return result;
+}
 #endif // CONFIG_WIFI
+
 
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 const char *config_get_server_uri(void)
@@ -365,6 +398,7 @@ static int string_validate(const struct shell *shell, const char *value, size_t 
 #endif /* defined(CONFIG_WIFI) || defined(CONFIG_ANJAY_CLIENT_GPS_NRF) ||
 	* !defined(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING)
 	*/
+
 
 #ifndef CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING
 static int flag_validate(const struct shell *shell, const char *value, size_t value_len,

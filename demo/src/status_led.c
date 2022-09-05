@@ -16,9 +16,9 @@
 
 #include "status_led.h"
 
-#include <devicetree.h>
-#include <drivers/gpio.h>
-#include <logging/log.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(status_led);
 

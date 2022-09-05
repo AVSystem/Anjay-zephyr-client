@@ -16,20 +16,28 @@
 
 #include "utils.h"
 #include <avsystem/commons/avs_utils.h>
-#include <drivers/hwinfo.h>
+#include <zephyr/drivers/hwinfo.h>
+
 #include <stdint.h>
 #include <string.h>
 
 #ifdef CONFIG_ANJAY_CLIENT_FOTA
-#include <dfu/mcuboot.h>
+#include <zephyr/dfu/mcuboot.h>
+#include <zephyr/storage/flash_map.h>
+
 #include <stdio.h>
-#include <storage/flash_map.h>
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
-#if defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#ifdef CONFIG_NRF_MODEM_LIB
 #include <modem/modem_info.h>
+#ifdef CONFIG_MODEM_KEY_MGMT
 #include <nrf_socket.h>
-#endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+#endif // CONFIG_MODEM_KEY_MGMT
+#endif // CONFIG_NRF_MODEM_LIB
+
+#ifdef CONFIG_NET_IPV6
+#include <zephyr/net/socketutils.h>
+#endif // CONFIG_NET_IPV6
 
 int get_device_id(struct device_id *out_id)
 {
@@ -86,12 +94,22 @@ static int get_fw_version(char *out_buf, size_t buf_size, uint8_t area_id)
 
 int get_fw_version_image_0(char *out_buf, size_t buf_size)
 {
-	return get_fw_version(out_buf, buf_size, FLASH_AREA_ID(image_0));
+#ifdef FIXED_PARTITION_ID
+	uint8_t area_id = FIXED_PARTITION_ID(slot0_partition);
+#else
+	uint8_t area_id = FLASH_AREA_ID(image_0);
+#endif
+	return get_fw_version(out_buf, buf_size, area_id);
 }
 
 int get_fw_version_image_1(char *out_buf, size_t buf_size)
 {
-	return get_fw_version(out_buf, buf_size, FLASH_AREA_ID(image_1));
+#ifdef FIXED_PARTITION_ID
+	uint8_t area_id = FIXED_PARTITION_ID(slot1_partition);
+#else
+	uint8_t area_id = FLASH_AREA_ID(image_1);
+#endif
+	return get_fw_version(out_buf, buf_size, area_id);
 }
 #endif // CONFIG_ANJAY_CLIENT_FOTA
 
@@ -116,3 +134,73 @@ int tls_session_cache_purge(void)
 	}
 }
 #endif // defined(CONFIG_NRF_MODEM_LIB) && defined(CONFIG_MODEM_KEY_MGMT)
+
+/*
+ * Copyright (c) 2019 Linaro Limited
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * This sntp_simple_ipv6 function is a copy of sntp_simple function from Zephyr
+ * (https://github.com/zephyrproject-rtos/zephyr/blob/zephyr-v3.0.0/subsys/net/lib/sntp/sntp_simple.c)
+ * repository. The only change is the desired address family.
+ */
+
+#ifdef CONFIG_NET_IPV6
+int sntp_simple_ipv6(const char *server, uint32_t timeout, struct sntp_time *time)
+{
+	int res;
+	static struct addrinfo hints;
+	struct addrinfo *addr;
+	struct sntp_ctx sntp_ctx;
+	uint64_t deadline;
+	uint32_t iter_timeout;
+
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = 0;
+	/* 123 is the standard SNTP port per RFC4330 */
+	res = net_getaddrinfo_addr_str(server, "123", &hints, &addr);
+
+	if (res < 0) {
+		/* Just in case, as namespace for getaddrinfo errors is
+		 * different from errno errors.
+		 */
+		errno = EDOM;
+		return res;
+	}
+
+	res = sntp_init(&sntp_ctx, addr->ai_addr, addr->ai_addrlen);
+	if (res < 0) {
+		goto freeaddr;
+	}
+
+	if (timeout == SYS_FOREVER_MS) {
+		deadline = (uint64_t)timeout;
+	} else {
+		deadline = k_uptime_get() + (uint64_t)timeout;
+	}
+
+	/* Timeout for current iteration */
+	iter_timeout = 100;
+
+	while (k_uptime_get() < deadline) {
+		res = sntp_query(&sntp_ctx, iter_timeout, time);
+
+		if (res != -ETIMEDOUT) {
+			break;
+		}
+
+		/* Exponential backoff with limit */
+		if (iter_timeout < 1000) {
+			iter_timeout *= 2;
+		}
+	}
+
+	sntp_close(&sntp_ctx);
+
+freeaddr:
+	freeaddrinfo(addr);
+
+	return res;
+}
+#endif // CONFIG_NET_IPV6

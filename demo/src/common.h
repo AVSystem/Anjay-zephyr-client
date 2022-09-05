@@ -16,14 +16,16 @@
 
 #pragma once
 
-#include <kernel.h>
-#include <shell/shell.h>
-#include <shell/shell_uart.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 
+#include <zephyr/kernel.h>
+#include <zephyr/shell/shell.h>
+#include <zephyr/shell/shell_uart.h>
+
 #include <anjay/anjay.h>
 
+#include "network/network.h"
 #include "objects/objects.h"
 
 extern volatile atomic_bool device_initialized;
@@ -39,6 +41,8 @@ extern volatile bool anjay_thread_running;
 extern struct k_mutex anjay_thread_running_mutex;
 extern struct k_condvar anjay_thread_running_condvar;
 
+void sched_update_anjay_network_bearer(void);
+
 #ifdef CONFIG_ANJAY_CLIENT_LOCATION_SERVICES_MANUAL_CELL_BASED
 struct cell_request_job_args {
 	anjay_t *anjay;
@@ -49,5 +53,3 @@ avs_sched_clb_t cell_request_job;
 #ifdef CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
 avs_sched_clb_t agps_request_job;
 #endif // CONFIG_ANJAY_CLIENT_GPS_NRF_A_GPS
-
-void interrupt_net_connect_wait_loop(void);

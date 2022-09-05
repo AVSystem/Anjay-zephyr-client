@@ -14,28 +14,34 @@
  * limitations under the License.
  */
 
-#include <devicetree.h>
 #include <stdlib.h>
-#include <sys/printk.h>
-#include <logging/log.h>
+
 #include <version.h>
 
-#include <net/dns_resolve.h>
-#include <net/sntp.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/printk.h>
+#include <zephyr/logging/log.h>
+
+#include <zephyr/net/dns_resolve.h>
+#include <zephyr/net/sntp.h>
 
 #include <anjay/anjay.h>
 #include <anjay/attr_storage.h>
 #include <anjay/security.h>
 #include <anjay/server.h>
-#include <net/net_conn_mgr.h>
-#include <net/net_core.h>
-#include <net/net_event.h>
-#include <net/net_mgmt.h>
+
+#include <zephyr/net/net_conn_mgr.h>
+#include <zephyr/net/net_core.h>
+#include <zephyr/net/net_event.h>
+#include <zephyr/net/net_mgmt.h>
 
 #include <avsystem/commons/avs_prng.h>
 
 #include "objects/objects.h"
-#include <random/rand32.h>
+
+#include <zephyr/random/rand32.h>
+
+#include "utils.h"
 
 #ifdef CONFIG_WIFI
 #ifdef CONFIG_WIFI_ESWIFI
@@ -46,8 +52,8 @@
 #include <esp_timer.h>
 #include <esp_event.h>
 #endif // CONFIG_WIFI_ESP32
-#include <net/wifi.h>
-#include <net/wifi_mgmt.h>
+#include <zephyr/net/wifi.h>
+#include <zephyr/net/wifi_mgmt.h>
 #endif // CONFIG_WIFI
 
 #ifdef CONFIG_LTE_LINK_CONTROL
@@ -55,12 +61,17 @@
 #endif // CONFIG_LTE_LINK_CONTROL
 
 #ifdef CONFIG_POSIX_API
-#include <posix/time.h>
+#include <zephyr/posix/time.h>
 #endif // CONFIG_POSIX_API
 
 #ifdef CONFIG_DATE_TIME
 #include <date_time.h>
 #endif // CONFIG_DATE_TIME
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+#include <openthread/thread.h>
+#include <zephyr/net/openthread.h>
+#endif // CONFIG_NET_L2_OPENTHREAD
 
 
 LOG_MODULE_REGISTER(zephyr_demo);
@@ -74,6 +85,33 @@ static avs_sched_handle_t update_objects_handle;
 
 static struct k_thread anjay_thread;
 K_THREAD_STACK_DEFINE(anjay_stack, ANJAY_THREAD_STACK_SIZE);
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+#define RETRY_SYNC_CLOCK_DELAY_TIME_S 1
+
+K_SEM_DEFINE(ot_ready, 0, 1);
+static struct k_work_delayable sync_clock_work;
+
+static void ot_state_changed(uint32_t flags, void *context)
+{
+	struct openthread_context *ot_context = context;
+
+	if (flags & OT_CHANGED_THREAD_ROLE) {
+		switch (otThreadGetDeviceRole(ot_context->instance)) {
+		case OT_DEVICE_ROLE_CHILD:
+		case OT_DEVICE_ROLE_ROUTER:
+		case OT_DEVICE_ROLE_LEADER:
+			k_sem_give(&ot_ready);
+			break;
+
+		case OT_DEVICE_ROLE_DISABLED:
+		case OT_DEVICE_ROLE_DETACHED:
+		default:
+			break;
+		}
+	}
+}
+#endif // CONFIG_NET_L2_OPENTHREAD
 
 static void set_system_time(const struct sntp_time *time)
 {
@@ -98,12 +136,29 @@ void synchronize_clock(void)
 	struct sntp_time time;
 	const uint32_t timeout_ms = 5000;
 
-	if (sntp_simple(CONFIG_ANJAY_CLIENT_NTP_SERVER, timeout_ms, &time)) {
-		LOG_WRN("Failed to get current time");
-	} else {
+	if (false
+#if defined(CONFIG_NET_IPV6)
+	    || !sntp_simple_ipv6(CONFIG_ANJAY_CLIENT_NTP_SERVER, timeout_ms, &time)
+#endif
+#if defined(CONFIG_NET_IPV4)
+	    || !sntp_simple(CONFIG_ANJAY_CLIENT_NTP_SERVER, timeout_ms, &time)
+#endif
+	) {
 		set_system_time(&time);
+	} else {
+		LOG_WRN("Failed to get current time");
+#ifdef CONFIG_NET_L2_OPENTHREAD
+		k_work_schedule(&sync_clock_work, K_SECONDS(RETRY_SYNC_CLOCK_DELAY_TIME_S));
+#endif // CONFIG_NET_L2_OPENTHREAD
 	}
 }
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+static void retry_synchronize_clock_work_handler(struct k_work *work)
+{
+	synchronize_clock();
+}
+#endif // CONFIG_NET_L2_OPENTHREAD
 
 static int register_objects(anjay_t *anjay)
 {
@@ -140,7 +195,7 @@ static void release_objects(void)
 	 */
 }
 
-void initialize_network(void)
+void network_initialize(void)
 {
 	LOG_INF("Initializing network connection...");
 #ifdef CONFIG_WIFI
@@ -173,7 +228,7 @@ void initialize_network(void)
 	strncpy(wifi_config.sta.password, CONFIG_ANJAY_CLIENT_WIFI_PASSWORD,
 		sizeof(wifi_config.sta.password));
 
-	if (esp_wifi_set_mode(WIFI_MODE_STA) ||
+	if (esp_wifi_set_mode(ESP32_WIFI_MODE_STA) ||
 	    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) || esp_wifi_connect()) {
 		LOG_ERR("connection failed");
 	}
@@ -204,6 +259,12 @@ void initialize_network(void)
 		abort();
 	}
 #endif // CONFIG_LTE_LINK_CONTROL
+
+#ifdef CONFIG_NET_L2_OPENTHREAD
+	k_work_init_delayable(&sync_clock_work, retry_synchronize_clock_work_handler);
+	openthread_set_state_changed_cb(ot_state_changed);
+	k_sem_take(&ot_ready, K_FOREVER);
+#endif // CONFIG_NET_L2_OPENTHREAD
 	LOG_INF("Connected to network");
 }
 
@@ -282,7 +343,7 @@ cleanup:
 
 void main(void)
 {
-	initialize_network();
+	network_initialize();
 
 	k_sleep(K_SECONDS(1));
 	synchronize_clock();

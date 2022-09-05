@@ -17,9 +17,9 @@
 #include <anjay/anjay.h>
 #include <anjay/ipso_objects.h>
 
-#include <drivers/sensor.h>
-#include <zephyr.h>
-#include <logging/log.h>
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include "objects.h"
 

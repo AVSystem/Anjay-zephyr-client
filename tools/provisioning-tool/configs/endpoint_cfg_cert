@@ -1,0 +1,19 @@
+{
+    OID.Security: {
+        1: {
+            RID.Security.ServerURI          : 'coaps://eu.iot.avsystem.cloud:5684',
+            RID.Security.Bootstrap          : False,
+            RID.Security.Mode               : 2,  # 0: PSK, 2: Cert, 3: NoSec
+            RID.Security.ShortServerID      : 1
+        },
+    },
+
+    OID.Server: {
+        1: {
+            RID.Server.ShortServerID        : 1,
+            RID.Server.Lifetime             : 86400,
+            RID.Server.NotificationStoring  : False,
+            RID.Server.Binding              : 'U'
+        },
+    }
+}
