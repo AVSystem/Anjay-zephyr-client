@@ -1,0 +1,12 @@
+/ {
+    aliases {
+        barometer = &lps22hb_press;
+        temperature = &lps22hb_press;
+        status-led = &led1;
+    };
+};
+
+&i2c1 {
+    lps22hb_press: lps22hb-press@5c {};
+	apds9960: apds9960@39 {};
+};

@@ -65,7 +65,7 @@ mcuboot_scratch:
   size: 0x10000
 mcuboot_secondary:
   address: 0x0
-  device: MX25R64
+  device: DT_CHOSEN(nordic_pm_ext_flash)
   end_address: 0xd8000
   placement:
     align:

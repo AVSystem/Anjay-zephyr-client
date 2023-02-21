@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,27 +28,32 @@ import west.util
 from requests import HTTPError
 from subprocess import CalledProcessError
 
+
 class ZephyrImageBuilder:
-    def __init__(self, board, image_dir):
+    def __init__(self, board, image_dir, conf_file):
         script_directory = os.path.dirname(os.path.realpath(__file__))
 
         self.board = board
-        self.image_dir = image_dir if image_dir else os.path.join(os.getcwd(), 'provisioning_builds')
+        self.image_dir = image_dir if image_dir else os.path.join(
+            os.getcwd(), 'provisioning_builds')
+        self.conf_file = conf_file
         self.image_path = {}
         self.overlay = {}
 
         for kind in ['initial', 'final']:
             self.image_path[kind] = os.path.join(self.image_dir, f'{kind}.hex')
-            self.overlay[kind] = os.path.join(script_directory, f'{kind}_overlay.conf')
+            self.overlay[kind] = os.path.join(
+                script_directory, f'{kind}_overlay_nrf9160dk.conf' if board == "nrf9160dk_nrf9160_ns" and kind == 'final' else f'{kind}_overlay.conf')
 
     def __build(self, kind):
         current_build_directory = os.path.join(self.image_dir, kind)
         os.makedirs(current_build_directory, exist_ok=True)
 
         subprocess.run(['west', 'build', '-b', self.board, '-d', current_build_directory,
-                        '-p', '--', f'-DOVERLAY_CONFIG={self.overlay[kind]}'], check=True)
+                        '-p', '--', f'-DOVERLAY_CONFIG={self.overlay[kind]}', f'-DCONF_FILE={self.conf_file}' if self.conf_file and kind == 'final' else ''], check=True)
 
-        shutil.move(os.path.join(current_build_directory, 'zephyr/merged.hex'), self.image_path[kind])
+        shutil.move(os.path.join(current_build_directory,
+                    'zephyr/merged.hex'), self.image_path[kind])
         shutil.rmtree(current_build_directory)
 
         return self.image_path[kind]
@@ -76,7 +81,8 @@ def get_images(args):
             print('Using provided final.hex file as a final provisioning image')
 
     if args.board and (initial_image is None or final_image is None):
-        builder = ZephyrImageBuilder(args.board, args.image_dir)
+        builder = ZephyrImageBuilder(
+            args.board, args.image_dir, args.conf_file)
 
         if initial_image is None:
             print('Initial provisioning image not provided - building')
@@ -91,8 +97,10 @@ def get_images(args):
 
     return initial_image, final_image
 
+
 def get_device_adapter(serial_number, baudrate):
-    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../board_adapters'))
+    sys.path.append(os.path.join(os.path.dirname(
+        os.path.realpath(__file__)), '../board_adapters'))
     adapter_module = importlib.import_module('nrf_adapter')
 
     config = {
@@ -105,6 +113,7 @@ def get_device_adapter(serial_number, baudrate):
 
     return adapter_module.TargetAdapter(config)
 
+
 def flash_device(device, image, chiperase, success_text):
     device.acquire_device()
     device.flash_device(image, chiperase)
@@ -114,6 +123,7 @@ def flash_device(device, image, chiperase, success_text):
 
     print('Device flashed succesfully')
 
+
 def mcumgr_download(port, src, baud=115200):
     with tempfile.TemporaryDirectory() as dst_dir_name:
         dst_file_name = os.path.join(dst_dir_name, 'result.txt')
@@ -121,27 +131,32 @@ def mcumgr_download(port, src, baud=115200):
         command = ['mcumgr', '--conntype', 'serial', '--connstring', connstring,
                    'fs', 'download', src, dst_file_name, '-t', '30']
 
-        subprocess.run(command, cwd=os.getcwd(), universal_newlines=True, check=True)
+        subprocess.run(command, cwd=os.getcwd(),
+                       universal_newlines=True, check=True)
 
         with open(dst_file_name) as dst_file:
             return dst_file.read()
 
+
 def mcumgr_upload(port, src, dst, baud=115200):
     subprocess.run(['mcumgr', '--conntype', 'serial', '--connstring', f'dev={port},baud={baud}', 'fs', 'upload', src, dst],
-                    cwd=os.getcwd(), universal_newlines=True, check=True)
+                   cwd=os.getcwd(), universal_newlines=True, check=True)
+
 
 def get_anjay_zephyr_path(manifest_path):
     with open(manifest_path, 'r') as stream:
         projects = yaml.safe_load(stream)['manifest']['projects']
         for project in projects:
-            if project['name'] == 'anjay-zephyr':
+            if project['name'].lower() == 'anjay-zephyr':
                 return os.path.join(west.util.west_topdir(), project['path'])
+
 
 def get_manifest_path():
     west_manifest_path = None
     west_manifest_file = None
 
-    west_config = subprocess.run(['west', 'config', '-l'], capture_output=True).stdout.split(b'\n')
+    west_config = subprocess.run(
+        ['west', 'config', '-l'], capture_output=True).stdout.split(b'\n')
     for config_entry in west_config:
         if config_entry.startswith(b'manifest.file'):
             west_manifest_file = config_entry.split(b'=')[1].strip()
@@ -164,6 +179,9 @@ def main():
     # Arguments for building the Zephyr images
     parser.add_argument('-b', '--board', type=str,
                         help='Board for which the image should be built, may be not provided if images are cached',
+                        required=False)
+    parser.add_argument('-f', '--conf_file', type=str,
+                        help='Application configuration file(s) for final image build, by default, prj.conf is used',
                         required=False)
     parser.add_argument('-i', '--image_dir', type=str,
                         help='Directory for the cached Zephyr hex images',
@@ -207,10 +225,13 @@ def main():
     manifest_path = get_manifest_path()
 
     if bool(args.server) != bool(args.token):
-        raise Exception('Server and token cli arguments should be always provided together')
+        raise Exception(
+            'Server and token cli arguments should be always provided together')
 
-    anjay_path = os.path.join(get_anjay_zephyr_path(manifest_path), 'deps/anjay')
-    provisioning_tool_path = os.path.join(anjay_path, 'tools/provisioning-tool')
+    anjay_path = os.path.join(
+        get_anjay_zephyr_path(manifest_path), 'deps/anjay')
+    provisioning_tool_path = os.path.join(
+        anjay_path, 'tools/provisioning-tool')
     sys.path.append(provisioning_tool_path)
     fp = importlib.import_module('factory_prov.factory_prov')
 
@@ -219,15 +240,17 @@ def main():
     print('Zephyr Images ready!')
 
     adapter = get_device_adapter(args.serial, args.baudrate)
-    flash_device(adapter, initial_image, True, 'Device ready for provisioning.')
+    flash_device(adapter, initial_image, True,
+                 'Device ready for provisioning.')
 
     port = adapter.get_port()
-    endpoint_name = mcumgr_download(port, '/factory/endpoint.txt', args.baudrate)
+    endpoint_name = mcumgr_download(
+        port, '/factory/endpoint.txt', args.baudrate)
 
     print(f'Downloaded endpoint name: {endpoint_name}')
 
     fcty = fp.FactoryProvisioning(args.endpoint_cfg, endpoint_name, args.server,
-                                    args.token, args.cert)
+                                  args.token, args.cert)
     if fcty.get_sec_mode() == 'cert':
         if args.scert is not None:
             fcty.set_server_cert(args.scert)
@@ -241,7 +264,8 @@ def main():
         last_cwd = os.getcwd()
         os.chdir(temp_directory)
         fcty.provision_device()
-        mcumgr_upload(adapter.get_port(), 'SenMLCBOR', '/factory/provision.cbor', args.baudrate)
+        mcumgr_upload(adapter.get_port(), 'SenMLCBOR',
+                      '/factory/provision.cbor', args.baudrate)
         os.chdir(last_cwd)
 
     if int(mcumgr_download(port, '/factory/result.txt', args.baudrate)) != 0:
@@ -250,7 +274,8 @@ def main():
     if args.server and args.token:
         fcty.register()
 
-    flash_device(adapter, final_image, False, 'persistence: Anjay restored from')
+    flash_device(adapter, final_image, False,
+                 'persistence: Anjay restored from')
 
 
 if __name__ == '__main__':

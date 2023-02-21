@@ -1,4 +1,4 @@
-# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,11 +18,7 @@ project(anjay_zephyr_demo)
 set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
 
 set(app_common_sources
-    src/main.c
-    src/utils.c
-    src/utils.h
-    src/objects/objects.h
-    src/objects/device.c)
+    src/main.c)
 
 target_sources(app PRIVATE
                 ${app_common_sources}

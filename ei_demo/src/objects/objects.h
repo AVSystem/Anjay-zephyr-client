@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,6 @@
 #pragma once
 
 #include <anjay/dm.h>
-
-const anjay_dm_object_def_t **device_object_create(void);
-void device_object_release(const anjay_dm_object_def_t **def);
-void device_object_update(anjay_t *anjay, const anjay_dm_object_def_t *const *def);
 
 const anjay_dm_object_def_t **pattern_detector_object_create(void);
 void pattern_detector_object_release(const anjay_dm_object_def_t **def);

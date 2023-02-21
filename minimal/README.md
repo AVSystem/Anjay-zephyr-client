@@ -11,6 +11,7 @@ This folder contains LwM2M Client minimal application example for following targ
  - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
  - [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)
  - [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html)
+ - [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)
 
 The following LwM2M Objects are supported:
  - Security (/0)
@@ -28,7 +29,7 @@ west update
 
 You can now compile the project using `west build -b <target>` in `minimal` directory.
 
-### Compilation guide for nRF9160DK, Thingy:91 and nRF52840DK
+### Compilation guide for nRF9160DK, Thingy:91, nRF52840DK and Arduino Nano 33 BLE Sense
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/minimal`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -37,7 +38,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns` or `west build -b nrf52840dk_nrf52840` in `minimal` directory, respectively. The last command compiles project for use with the OpenThread network, more about this can be found in the section `Connecting to the LwM2M Server with OpenThread`.
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 
 > **__NOTE:__**
@@ -63,10 +64,28 @@ mcumgr --conntype serial --connstring dev=/dev/ttyACM0 image upload build/zephyr
 mcumgr --conntype serial --connstring dev=/dev/ttyACM0 reset
 ```
 
+### Flashing Arduino Nano 33 BLE Sense
+
+Arduino boards are shipped with an onboard bootloader that requires Arduino variant of bossac tool.
+There are two ways to obtain it, as described in `Programming and Debugging` section of
+[Arduino Nano 33 BLE in Zephyr documentation](https://docs.zephyrproject.org/latest/boards/arm/arduino_nano_33_ble/doc/index.html).
+According to the above, once you have a path to bossac, you are ready to flash the board.
+
+Attach the board to your computer using the USB cable. Then, to get onboard bootloader ready to flash the program,
+double-tap the RESET button. There should be a pulsing orange LED near the USB port.
+In directory `anjay-zephyr-client/demo/` run command to flash a board:
+```bash
+west flash --bossac="<path to the arduino version of bossac>"
+```
+For example
+```bash
+west flash --bossac=$HOME/.arduino15/packages/arduino/tools/bossac/1.9.1-arduino2/bossac
+```
+
 ## qemu_x86 networking setup
 
 To enable networking when running qemu_x86 target and be able to connect to the internet,
-there is an [official guide on networking with the host system](https://docs.zephyrproject.org/latest/guides/networking/networking_with_host.html). Below is a shorter version on how to run the example.
+there is an [official guide on networking with the host system](https://docs.zephyrproject.org/latest/connectivity/networking/networking_with_host.html). Below is a shorter version on how to run the example.
 
 First download [Zephyr `net-tools` project](https://github.com/zephyrproject-rtos/net-tools)
 and run `net-setup.sh`, this will create `zeth` interface that will be used for networking by qemu.
@@ -108,8 +127,8 @@ can be changed in the Configuration menu.
 
 ## Connecting to the LwM2M Server with OpenThread
 
-To use this project on the nRF52840dk board, in addition to the configuration shown in the previous paragraph, you will need to configure the OpenThread Border Router and Commissioner as described in the guides from the links below.
-You can change default `CONFIG_OPENTHREAD_JOINER_PSKD` value in the `boards/nrf52840dk_nrf52840.conf`. In same file, replace `CONFIG_OPENTHREAD_MTD=y` with `CONFIG_OPENTHREAD_FTD=y` if you want your device to run as an FTD.
+To use this project on the nRF52840dk board or Arduino Nano 33 BLE Sense in addition to the configuration shown in the previous paragraph, you will need to configure the OpenThread Border Router and Commissioner as described in the guides from the links below.
+You can change default `CONFIG_OPENTHREAD_JOINER_PSKD` value in the `boards/nrf52840dk_nrf52840.conf` for nRF or in `boards/arduino_nano_33_ble_sense.conf` for Arduino. In same file, replace `CONFIG_OPENTHREAD_MTD=y` with `CONFIG_OPENTHREAD_FTD=y` if you want your device to run as an FTD.
 
 Resources:
 - [Introduction to OpenThread](https://openthread.io/guides)

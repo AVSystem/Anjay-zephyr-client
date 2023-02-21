@@ -1,5 +1,20 @@
 # Changelog
 
+## 23.02 (Feb 21st, 2023)
+
+### Features
+- Added support for arduino_nano_33_ble_sense board
+- Added runtime certificate configuration option
+- Added possibility to set PSK in hexadecimal format
+
+### Improvements
+- Moved common code from demo samples to Anjay Zephyr
+- Updated sdk-nrf to final 2.2.0
+- Disabled Access Control in the minimal project
+
+### Bugfixes
+- Made firmware update with external flash on nRF9160DK work again
+
 ## 22.12 (Dec 13th, 2022)
 
 ### Features
@@ -11,7 +26,7 @@
 
 ### Improvements
 - Updated Zephyr to 3.2.0
-- Updated sdk-nrf to 2.1.1
+- Updated sdk-nrf to 2.2.0-rc1
 - Refactored network connection handling
 - Firmware update success status can be now persisted across reboots until actual delivery
 

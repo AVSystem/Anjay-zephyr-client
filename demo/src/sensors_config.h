@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,6 @@
 
 #pragma once
 
-#include <stdint.h>
+#include <anjay_zephyr/ipso_objects.h>
 
-#ifdef CONFIG_NET_IPV6
-#include <zephyr/net/sntp.h>
-#endif // CONFIG_NET_IPV6
-
-struct device_id {
-	// 96 bits as hex + NULL-byte
-	char value[25];
-};
-
-int get_device_id(struct device_id *out_id);
-#ifdef CONFIG_NET_IPV6
-int sntp_simple_ipv6(const char *server, uint32_t timeout, struct sntp_time *time);
-#endif // CONFIG_NET_IPV6
+void sensors_install(anjay_t *anjay);

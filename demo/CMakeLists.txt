@@ -1,4 +1,4 @@
-# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -90,115 +90,20 @@ elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
     endif()
 endif()
 
-if(CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH)
+if(CONFIG_ANJAY_ZEPHYR_FACTORY_PROVISIONING_INITIAL_FLASH)
     set(app_sources
-        src/config.c
-        src/config.h
-        src/persistence.c
-        src/persistence.h
-        src/utils.c
-        src/utils.h
         src/factory_provisioning/factory_flash.c
         src/factory_provisioning/factory_flash.h
         src/factory_provisioning/provisioning_app.c)
 else()
     set(app_sources
-        src/anjay_shell.c
-        src/common.h
-        src/config.c
-        src/config.h
-        src/default_config.h
-        src/firmware_update.h
-        src/gps.h
         src/main_app.c
-        src/persistence.h
+        src/sensors_config.c
+        src/sensors_config.h
         src/status_led.c
         src/status_led.h
-        src/utils.c
-        src/utils.h
-        src/network/network.c
-        src/network/network.h
-        src/network/network_internal.h
-        src/objects/basic_sensors.c
-        src/objects/buzzer.c
-        src/objects/device.c
-        src/objects/led_color_light.c
-        src/objects/location.c
-        src/objects/objects.h
-        src/objects/push_button.c
-        src/objects/switch.c
-        src/objects/three_axis_sensors.c)
-
-    if(CONFIG_ANJAY_CLIENT_PERSISTENCE)
-        list(APPEND app_sources
-             src/persistence.c)
-    endif()
-
-    if(CONFIG_ANJAY_CLIENT_GPS_NRF)
-        list(APPEND app_sources
-             src/gps_impl/gps_nrf.c)
-    endif()
-
-    if(CONFIG_ANJAY_CLIENT_NRF_LC_INFO)
-        list(APPEND app_sources
-             src/nrf_lc_info.c
-             src/nrf_lc_info.h
-             src/objects/conn_mon.c
-             src/objects/ecid.c)
-    endif()
-
-    if(CONFIG_ANJAY_CLIENT_LOCATION_SERVICES)
-        list(APPEND app_sources
-             src/objects/loc_assist.c)
-    endif()
-
-    if(CONFIG_ANJAY_CLIENT_FOTA)
-        list(APPEND app_sources
-             src/firmware_update.c)
-    endif()
-
-    if(CONFIG_LTE_LINK_CONTROL)
-        list(APPEND app_sources
-             src/network/network_nrf91.c)
-    elseif(CONFIG_NET_L2_OPENTHREAD)
-        list(APPEND app_sources
-             src/network/network_openthread.c)
-    elseif(CONFIG_WIFI_ESP32)
-        list(APPEND app_sources
-             src/network/network_esp32.c)
-    elseif(CONFIG_WIFI_ESWIFI)
-        list(APPEND app_sources
-             src/network/network_eswifi.c)
-    elseif(CONFIG_WIFI)
-        list(APPEND app_sources
-             src/network/network_wifi.c)
-    else()
-        message(FATAL_ERROR "Neither CONFIG_LTE_LINK_CONTROL nor CONFIG_WIFI is enabled")
-    endif()
+        src/peripherals.h)
 endif()
 
 target_sources(app PRIVATE
                ${app_sources})
-
-if(CONF_FILE_BUILD_TYPE MATCHES ".*extflash.*" AND CONFIG_BOOTLOADER_MCUBOOT)
-    # This is a workaround for a bug in nCS' integration with TF-M.
-    #
-    # When MCUboot and TF-M are both in use, the CONFIG_BOOTLOADER_MCUBOOT
-    # option is propagated to TF-M (https://github.com/nrfconnect/sdk-nrf/blob/v2.0.0/modules/tfm/zephyr/CMakeLists.txt#L115),
-    # which in turn enables the BL2 option (https://github.com/nrfconnect/sdk-nrf/blob/v2.0.0/modules/tfm/tfm/boards/CMakeLists.txt#L34)
-    # and that declares a flash region (https://github.com/nrfconnect/sdk-trusted-firmware-m/blob/v1.5.0-ncs2/platform/ext/target/nordic_nrf/common/nrf9160/target_cfg.c#L420)
-    # which TF-M will try to configure as non-secure
-    # (https://github.com/nrfconnect/sdk-trusted-firmware-m/blob/v1.5.0-ncs2/platform/ext/target/nordic_nrf/common/nrf9160/target_cfg.c#L552).
-    #
-    # Because the hardware flash protection only works for the internal flash,
-    # and these addresses are not valid in that context, the MCU hard-faults and
-    # consequently enters a boot loop.
-    #
-    # This workaround overrides the CONFIG_BOOTLOADER_MCUBOOT setting, so that
-    # BL2 macro is not defined, and this issue does not happen.
-    #
-    # See also the bug report on Nordic DevZone:
-    # https://devzone.nordicsemi.com/f/nordic-q-a/89735/nrf9160-external-flash-mcuboot-buggy-flash-protection-configuration-in-sdk
-    set_property(TARGET zephyr_property_target APPEND PROPERTY TFM_CMAKE_OPTIONS
-                 -DCONFIG_BOOTLOADER_MCUBOOT=FALSE)
-endif()

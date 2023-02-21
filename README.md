@@ -6,6 +6,8 @@ This repository contains LwM2M Client samples based on open-source
 [Anjay Zephyr Module](https://github.com/AVSystem/Anjay-zephyr) and
 [Zephyr OS](https://github.com/zephyrproject-rtos/zephyr).
 
+More information and step-by-step instruction can be found in [the Anjay integration IoT Developer Zone](https://iotdevzone.avsystem.com/docs/Anjay_integrations/Getting_started/).
+
 The following examples are present:
 
 <table>
@@ -24,6 +26,7 @@ The following examples are present:
         [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
         [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
         [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
+        [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)<br>
         any other board of your choice (by adding appropriate <code>*.conf</code>/<code>*.overlay</code> files). FOTA support for selected boards.
       </td>
     </tr>
@@ -36,6 +39,7 @@ The following examples are present:
         [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
         [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
         [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
+        [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)<br>
       </td>
     </tr>
     <tr>
@@ -50,7 +54,7 @@ The following examples are present:
 
 ## Getting started
 
-First of all, get Zephyr, SDK and other dependecies, as described in Zephyr's
+First of all, get Zephyr, SDK and other dependencies, as described in Zephyr's
 [Getting Started Guide](https://docs.zephyrproject.org/latest/getting_started/index.html)
 (first 4 steps).
 

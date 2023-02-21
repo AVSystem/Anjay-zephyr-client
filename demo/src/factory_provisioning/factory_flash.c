@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,9 @@
 #include <avsystem/commons/avs_stream_v_table.h>
 #include <avsystem/commons/avs_utils.h>
 
+#include <anjay_zephyr/config.h>
+
 #include "factory_flash.h"
-#include "../config.h"
 
 /*
  * THE PROCESS FOR FLASHING FACTORY PROVISIONING INFORMATION
@@ -37,7 +38,7 @@
  * High level flow from the user's standpoint:
  *
  * 1. Flash the board with firmware that has
- *    CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH enabled.
+ *    CONFIG_ANJAY_ZEPHYR_FACTORY_PROVISIONING_INITIAL_FLASH enabled.
  * 2. Wait for the board to boot. For best results, open some terminal program
  *    to flush any data sent by the board while booting that might be already
  *    buffered by the OS serial port handling.
@@ -50,8 +51,8 @@
  * 5. Examine the code in result.txt. If it's "0", then the operation was
  *    successful.
  * 6. Flash the board with firmware that has
- *    CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING enabled, but
- *    CONFIG_ANJAY_CLIENT_FACTORY_PROVISIONING_INITIAL_FLASH disabled.
+ *    CONFIG_ANJAY_ZEPHYR_FACTORY_PROVISIONING enabled, but
+ *    CONFIG_ANJAY_ZEPHYR_FACTORY_PROVISIONING_INITIAL_FLASH disabled.
  *
  * What happens under the hood during steps 3 and 4:
  *
@@ -282,7 +283,7 @@ static int provision_fs_stat(struct fs_mount_t *mountp, const char *path, struct
 		file_info->value = factory_flash_result;
 	} else {
 		file_info = &files[EP_FILE];
-		file_info->value = config_default_ep_name();
+		file_info->value = anjay_zephyr_config_default_ep_name();
 	}
 
 	file_info->size = strlen(file_info->value);

@@ -4,7 +4,7 @@ Project containing all implemented features, intended to be a showcase.
 ## Supported hardware and overview
 
 This folder contains LwM2M Client application example, which targets
-[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc) and [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk).
+[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) and [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense).
 
 There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
 
@@ -12,13 +12,17 @@ It's possible to run the demo on other boards of your choice, by adding appropri
 
 The following LwM2M Objects are supported:
 
-| Target         | Objects                                                                                                                                                                                                                                                                                                                                                       |
-|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Common         | Security (/0)<br>Server (/1)<br>Device (/3)                                                                                                                                                                                                                                                                                                                   |
-| B-L475E-IOT01A | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347)                                                                                                                                      |
-| nRF9160DK      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental)                                                                                                              |
-| Thingy:91      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
-| nRF52840DK     | Push button (/3347)                                                                                                                                                                                                                                                                                                                                           |
+| Target                         | Objects                                                                                                                                                                                                                                                                                                                                                       |
+|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Common                         | Security (/0)<br>Server (/1)<br>Device (/3)                                                                                                                                                                                                                                                                                                                   |
+| B-L475E-IOT01A                 | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347)                                                                                                                                      |
+| nRF9160DK                      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental)                                                                                                              |
+| Thingy:91                      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
+| nRF52840DK                     | Push button (/3347)                                                                                                                                                                                                                                                                                                                                           |
+| Arduino Nano 33 Ble Sense Lite | Barometer (/3315)<br>Temperature (/3303)                                                                                                                                                                                                                                                                                                                      |
+
+> **__NOTE:__**
+> Lite version of `Arduino Nano 33 BLE Sense` does NOT contain HTS221 sensor.
 
 ## Compilation
 
@@ -31,7 +35,7 @@ west update
 
 You can now compile the project for B-L475E-IOT01A using `west build -b disco_l475_iot1` in `demo` directory.
 
-### Compilation guide for nRF9160DK, Thingy:91 and nRF52840DK
+### Compilation guide for nRF9160DK, Thingy:91, nRF52840DK and Arduino Nano 33 BLE Sense
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/demo`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -40,7 +44,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns` or `west build -b nrf52840dk_nrf52840` in `demo` directory, respectively. The last command compiles project for use with the OpenThread network, more about this can be found in the section `Connecting to the LwM2M Server with OpenThread`.
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 
 > **__NOTE:__**
@@ -75,9 +79,27 @@ After successful build you can flash the target using `west flash`.
 >
 > Alternatively, you can remove the ``udp_dtls_hs_tx_params`` assignment in the ``initialize_anjay()`` function in ``main.c`` to make it work on older versions. However, the ``anjay stop`` command may then take an excessive amount of time. Please also note that the application has not been tested with older modem firmware versions.
 
+### Flashing Arduino Nano 33 BLE Sense
+
+Arduino boards are shipped with an onboard bootloader that requires Arduino variant of bossac tool.
+There are two ways to obtain it, as described in `Programming and Debugging` section of
+[Arduino Nano 33 BLE in Zephyr documentation](https://docs.zephyrproject.org/latest/boards/arm/arduino_nano_33_ble/doc/index.html).
+According to the above, once you have a path to bossac, you are ready to flash the board.
+
+Attach the board to your computer using the USB cable. Then, to get onboard bootloader ready to flash the program,
+double-tap the RESET button. There should be a pulsing orange LED near the USB port.
+In directory `anjay-zephyr-client/demo/` run command to flash a board:
+```bash
+west flash --bossac="<path to the arduino version of bossac>"
+```
+For example
+```bash
+west flash --bossac=$HOME/.arduino15/packages/arduino/tools/bossac/1.9.1-arduino2/bossac
+```
+
 ## Running the demo on other boards
 
-To run the demo on another board not listed above, create `boards/<board_symbol>.conf` and `boards/<board_symbol>.overlay` files. Then, in `.conf` file supply `CONFIG_ANJAY_CLIENT_DEVICE_MANUFACTURER` and `CONFIG_ANJAY_CLIENT_MODEL_NUMBER` settings, to make your device show up correctly in Device (/3) object. You should also add other settings enabling connectivity, peripherals, etc.
+To run the demo on another board not listed above, create `boards/<board_symbol>.conf` and `boards/<board_symbol>.overlay` files. Then, in `.conf` file supply `CONFIG_ANJAY_ZEPHYR_DEVICE_MANUFACTURER` and `CONFIG_ANJAY_ZEPHYR_MODEL_NUMBER` settings, to make your device show up correctly in Device (/3) object. You should also add other settings enabling connectivity, peripherals, etc.
 
 If you wish to connect the available sensors on your board to the LwM2M client, you must add appropriate labels and aliases in `.overlay` file ([official Zephyr HOWTO on devicetree overlays](https://docs.zephyrproject.org/latest/guides/dts/howtos.html#use-devicetree-overlays) might be helpful).
 
@@ -115,8 +137,8 @@ can be changed in the Configuration menu.
 
 ## Connecting to the LwM2M Server with OpenThread
 
-To use this project on the nRF52840dk board, in addition to the configuration shown in the previous paragraph, you will need to configure the OpenThread Border Router and Commissioner as described in the guides from the links below.
-You can change default `CONFIG_OPENTHREAD_JOINER_PSKD` value in the `boards/nrf52840dk_nrf52840.conf`. In same file, replace `CONFIG_OPENTHREAD_FTD=y` with `CONFIG_OPENTHREAD_MTD=y` if you want your device to run as an MTD.
+To use this project on the nRF52840dk board or Arduino Nano 33 BLE Sense in addition to the configuration shown in the previous paragraph, you will need to configure the OpenThread Border Router and Commissioner as described in the guides from the links below.
+You can change default `CONFIG_OPENTHREAD_JOINER_PSKD` value in the `boards/nrf52840dk_nrf52840.conf` for nRF or in `boards/arduino_nano_33_ble_sense.conf` for Arduino. In same file, replace `CONFIG_OPENTHREAD_FTD=y` with `CONFIG_OPENTHREAD_MTD=y` if you want your device to run as an MTD.
 
 Resources:
 - [Introduction to OpenThread](https://openthread.io/guides)
@@ -135,6 +157,35 @@ Subcommands:
   stop                 :Stop Anjay
   config               :Configure Anjay params
   session_cache_purge  :Remove the TLS session data cached in the nRF modem
+```
+
+## Runtime certificate and private key configuration
+
+To build a project with runtime certificate and private key, the following command will be suitable for most boards:
+```
+west build -b <BOARD> -p -- -DCONFIG_ANJAY_ZEPHYR_RUNTIME_CERT_CONFIG=y
+```
+where `<BOARD>` should be replaced by the selected board from `boards/` directory.
+
+> **__NOTE:__**
+> Runtime certificate and private key do not work with Thingy:91 and Arduino Nano 33 BLE Sense.
+
+This feature works with nrf9160dk starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
+```
+west build -b nrf9160dk_nrf9160_ns@0.14.0 -p -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG="overlay_nrf_mbedtls.conf"
+```
+
+After that, certificate and private key based on SECP256R1 curve can be provided through shell interface in PEM format. To generate them use following commands (to use certificate and private key with Coiote DM you must specify a common name that is the same as the client endpoint name):
+```
+openssl ecparam -name secp256r1 -out ecparam.der
+openssl req -new -x509 -nodes -newkey ec:ecparam.der -keyout demo-cert.key -out demo-cert.crt -days 3650
+openssl x509 -in demo-cert.crt -outform pem -out cert.pem
+openssl ec -in demo-cert.key -outform pem -out key.pem
+```
+Then provide the generated certificate and private key through the shell with the following commands respectively:
+```
+anjay config set public_cert
+anjay config set private_key
 ```
 
 ## Tips and tricks
@@ -169,15 +220,16 @@ There are a few new and important command-line arguments:
 * `--board` (`-b`) - the board for which the images should be built,
 * `--image_dir` (`-i`) - directory for the cached Zephyr hex images,
 * `--serial` (`-s`) - serial number of the device to be used,
-* `--baudrate` (`-B`) - baudrate for the used serial port, when it is not provided the default value is 115200.
+* `--baudrate` (`-B`) - baudrate for the used serial port, when it is not provided the default value is 115200,
+* `--conf_file` (`-f`) - application configuration file(s) for final image build, by default, `prj.conf` is used.
 
 If the image `initial.hex` exists in the given `image_dir` the initial provisioning image won't be built and the same works for
 final image and `final.hex`. When `image_dir` path is provided, but some images are missing, they will be built in the given directory.
 If `image_dir` is not provided then the images will be built in `$(pwd)/provisioning_builds`.
 
-Before using the script make sure that in the shell in which you run it the `west build` command would work and
-that all of the configs passed to the script are valid - in particular, make sure that you changed `<YOUR_DOMAIN>` in `lwm2m_server.json`
-config file to your actual domain in EU cloud Coiote installation (or fill the whole file with some different valid server configuration).
+Before using the script make sure that in the shell in which you run it the `west build` command would work for a selected board (please remember to update manifest file as described in the compiling guides above but with absolute manifest.path) and
+that all of the configs passed to the script are valid - in particular, make sure that you changed `<YOUR_DOMAIN>` in `tools/provisioning-tools/configs/lwm2m_server.json`
+config file to your actual domain in EU cloud Coiote installation (or fill the whole `lwm2m_server.json` and `endpoint_cfg` files with some different valid server configuration).
 
 Currently the script is designed only for Nordic boards, and it was tested with nRF 9160DK.
 
@@ -188,6 +240,8 @@ Example script invocation from the `demo` for provisioning some nRF 9160DK board
 ```
 
 where `<SERIAL>` should be replaced by our board's serial number and `<TOKEN>` should be replaced by some valid authentication token for the Coiote server provided in the `lwm2m_server.json` file.
+
+The generation of token is explained in the Coiote documentation. In Coiote click on the question mark in the top right corner, then Documentation -> User. The description can be found in [Rest API -> REST API authentication section](https://eu.iot.avsystem.cloud/doc/user/REST_API/REST_API_Authentication/).
 
 ### Using Certificate Mode with factory provisioning
 

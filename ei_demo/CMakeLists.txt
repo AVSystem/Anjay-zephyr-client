@@ -1,4 +1,4 @@
-# Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,12 +30,9 @@ set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
 # Anjay zephyr client
 set(app_common_sources
     src/main.c
-    src/utils.c
-    src/utils.h
     src/led.c
     src/led.h
     src/objects/objects.h
-    src/objects/device.c
     src/objects/pattern_detector.c)
 
 target_sources(app PRIVATE ${app_common_sources})

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2022 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,16 +24,17 @@
 #include <anjay/security.h>
 #include <anjay/server.h>
 
-#include "../config.h"
-#include "../persistence.h"
+#include <anjay_zephyr/config.h>
+#include <anjay_zephyr/factory_provisioning.h>
+
 #include "factory_flash.h"
 
 LOG_MODULE_REGISTER(provisioning_app);
 
 static anjay_t *initialize_anjay(void)
 {
-	anjay_t *anjay = anjay_new(
-		&(const anjay_configuration_t){ .endpoint_name = config_default_ep_name() });
+	anjay_t *anjay = anjay_new(&(const anjay_configuration_t){
+		.endpoint_name = anjay_zephyr_config_default_ep_name() });
 
 	if (!anjay) {
 		LOG_ERR("Could not create Anjay object");
@@ -59,7 +60,7 @@ static void factory_provision(void)
 		abort();
 	}
 
-	if (is_factory_provisioning_info_present()) {
+	if (anjay_zephyr_is_factory_provisioning_info_present()) {
 		LOG_INF("Factory provisioning information already present. "
 			"Please flash production firmware. Halting.");
 	} else {
@@ -77,7 +78,7 @@ static void factory_provision(void)
 		avs_error_t err = anjay_factory_provision(anjay, stream);
 		// NOTE: Not calling avs_stream_cleanup() because stream is *NOT* heap-allocated
 
-		if (avs_is_ok(err) && persist_factory_provisioning_info(anjay)) {
+		if (avs_is_ok(err) && anjay_zephyr_persist_factory_provisioning_info(anjay)) {
 			err = avs_errno(AVS_EIO);
 		}
 		factory_flash_finished(avs_is_ok(err) ? 0 : -1);
@@ -92,7 +93,7 @@ void main(void)
 {
 	LOG_PANIC();
 
-	if (persistence_init()) {
+	if (anjay_zephyr_persistence_init()) {
 		LOG_ERR("Can't initialize persistence");
 	}
 
