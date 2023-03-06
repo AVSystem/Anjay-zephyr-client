@@ -22,11 +22,11 @@ The following examples are present:
       <td>demo/</td>
       <td>
         Showcase example implementing all features and sensors available on board. Supports experimental <strong>factory provisioning</strong> feature of Anjay 3.0. Supported boards:<br>
-        [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>
-        [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
-        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
-        [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
-        [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)<br>
+        <a href="https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html">B-L475E-IOT01A Discovery kit</a><br>
+        <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
+        <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
+        <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
         any other board of your choice (by adding appropriate <code>*.conf</code>/<code>*.overlay</code> files). FOTA support for selected boards.
       </td>
     </tr>
@@ -34,19 +34,19 @@ The following examples are present:
       <td>minimal/</td>
       <td>
         Minimalistic client samples which may serve as a base for specific application. Supported boards/targets:<br>
-        [qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)<br>
-        [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html)<br>
-        [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK)<br>
-        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)<br>
-        [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)<br>
-        [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)<br>
+        <a href="https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html">qemu_x86</a><br>
+        <a href="https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html">B-L475E-IOT01A Discovery kit</a><br>
+        <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
+        <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
+        <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
       </td>
     </tr>
     <tr>
       <td>ei_demo/</td>
       <td>
         An example containing motion recognition model, built with Edge Impulse. Supported boards/targets:<br>
-        [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91)
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a>
       </td>
     </tr>
   </tbody>
