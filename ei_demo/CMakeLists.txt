@@ -20,8 +20,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # EI API key has to be set in order to download the TinyML model from EI.
 # set(EI_API_KEY_HEADER "x-api-key:ei_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
 
-set(PM_STATIC_YML_FILE "${CMAKE_CURRENT_SOURCE_DIR}/boards/thingy91_nrf9160_ns_partitions.yml")
-
 # Anjay zephyr client
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(anjay_zephyr_demo)

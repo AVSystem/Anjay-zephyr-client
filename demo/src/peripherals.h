@@ -25,6 +25,12 @@
 #define BUZZER_NODE DT_ALIAS(buzzer_pwm)
 #define BUZZER_AVAILABLE DT_NODE_HAS_STATUS(BUZZER_NODE, okay)
 
+#define LIGHT_CONTROL_NODE(idx) DT_ALIAS(light_control_##idx)
+#define LIGHT_CONTROL_AVAILABLE(idx) DT_NODE_HAS_STATUS(LIGHT_CONTROL_NODE(idx), okay)
+#define LIGHT_CONTROL_AVAILABLE_ANY                                                                \
+	(LIGHT_CONTROL_AVAILABLE(0) || LIGHT_CONTROL_AVAILABLE(1) || LIGHT_CONTROL_AVAILABLE(2) || \
+	 LIGHT_CONTROL_AVAILABLE(3))
+
 #define PUSH_BUTTON_NODE(idx) DT_ALIAS(push_button_##idx)
 #define PUSH_BUTTON_AVAILABLE(idx) DT_NODE_HAS_STATUS(PUSH_BUTTON_NODE(idx), okay)
 #define PUSH_BUTTON_AVAILABLE_ANY                                                                  \

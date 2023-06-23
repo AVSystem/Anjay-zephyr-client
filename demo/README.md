@@ -4,23 +4,23 @@ Project containing all implemented features, intended to be a showcase.
 ## Supported hardware and overview
 
 This folder contains LwM2M Client application example, which targets
-[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk) and [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense).
+[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk), [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK) and [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense).
 
 There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
 
 It's possible to run the demo on other boards of your choice, by adding appropriate configuration files and aliases for available sensors/peripherals (more info below).
 
-The following LwM2M Objects are supported:
+The following LwM2M Objects are supported by default:
 
-| Target                         | Objects                                                                                                                                                                                                                                                                                                                                                       |
-|--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Common                         | Security (/0)<br>Server (/1)<br>Device (/3)                                                                                                                                                                                                                                                                                                                   |
-| B-L475E-IOT01A                 | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347)                                                                                                                                      |
-| nRF9160DK                      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental)                                                                                                              |
-| Thingy:91                      | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6, configurable in Kconfig)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>Location Assistance (/50001, experimental) |
-| nRF52840DK                     | Push button (/3347)                                                                                                                                                                                                                                                                                                                                           |
-| Arduino Nano 33 Ble Sense Lite | Barometer (/3315)<br>Temperature (/3303)                                                                                                                                                                                                                                                                                                                      |
-
+| Target | Objects |
+|--------|---------|
+| Common | Security (/0)<br>Server (/1)<br>Device (/3) |
+| B-L475E-IOT01A | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347) |
+| nRF9160DK | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
+| Thingy:91 | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
+| nRF52840DK | Push button (/3347) |
+| nRF7002DK | Light Control (/3311)<br>Push button (/3347) |
+| Arduino Nano 33 BLE Sense Lite | Temperature (/3303)<br>Barometer (/3315) |
 > **__NOTE:__**
 > Lite version of `Arduino Nano 33 BLE Sense` does NOT contain HTS221 sensor.
 
@@ -35,7 +35,7 @@ west update
 
 You can now compile the project for B-L475E-IOT01A using `west build -b disco_l475_iot1` in `demo` directory.
 
-### Compilation guide for nRF9160DK, Thingy:91, nRF52840DK and Arduino Nano 33 BLE Sense
+### Compilation guide for nRF9160DK, Thingy:91, nRF7002DK, nRF52840DK and Arduino Nano 33 BLE Sense
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/demo`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -44,7 +44,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 
 > **__NOTE:__**
@@ -69,6 +69,22 @@ On Nordic boards, security is provided using the (D)TLS sockets implemented in m
 However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites) that are not supported by the modem.
 
 To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG=overlay_nrf_mbedtls.conf`.
+
+### Compiling with experimental Advanced Firmware Update object
+
+For nRF9160-based targets (nRF9160DK and Thingy:91), it is possible to enable Advanced Firmware Update (/33629) object as an alternative
+to Firmware Update (/5) object, which allows for upgrading both application firmware and modem firmware over LwM2M.
+
+`application` instance of aforementioned object is used to update the application firmware, while `modem` instance accepts
+[modem firmware delta patches](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/2.4.0/nrfxlib/nrf_modem/doc/delta_dfu.html).
+
+Binaries used to update the application are the same as those used in default Firmware Update (/5) object. nRF9160 firmware can be found [here](https://www.nordicsemi.com/Products/nRF9160/Download#infotabs).
+
+To compile in this configuration, use `west build -b <board-name> -- -DOVERLAY_CONFIG=overlay_nrf9160_afu.conf`.
+
+Additionally, on nRF9160DK revisions 0.14.0 and up, it's possible to also update modem firmware using [full firmware packages](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/2.4.0/nrfxlib/nrf_modem/doc/bootloader.html).
+
+To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG=overlay_nrf9160_afu_full.conf`.
 
 ## Flashing the target
 
@@ -114,6 +130,7 @@ Currently, our demo searches for aliases listed below (they map to appropriate L
 - `gyrometer`
 - `magnetometer`
 - `rgb_pwm`
+- `light-control`
 - `buzzer_pwm`
 - `push-button-[0-2]`
 - `switch-[0-2]`
@@ -168,7 +185,7 @@ west build -b <BOARD> -p -- -DCONFIG_ANJAY_ZEPHYR_RUNTIME_CERT_CONFIG=y
 where `<BOARD>` should be replaced by the selected board from `boards/` directory.
 
 > **__NOTE:__**
-> Runtime certificate and private key do not work with Thingy:91 and Arduino Nano 33 BLE Sense.
+> Runtime certificate and private key do not work with Thingy:91.
 
 This feature works with nrf9160dk starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
 ```

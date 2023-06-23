@@ -22,8 +22,6 @@
 #include <zephyr/fs/fs_sys.h>
 #include <zephyr/kernel.h>
 
-#include <fs_mgmt/fs_mgmt.h>
-
 #include <avsystem/commons/avs_errno_map.h>
 #include <avsystem/commons/avs_stream_v_table.h>
 #include <avsystem/commons/avs_utils.h>
@@ -368,8 +366,6 @@ avs_stream_t *factory_flash_input_stream_init(void)
 	if (fs_register(PROVISION_FS_TYPE, &provision_fs) || fs_mount(&provision_fs_mount_point)) {
 		return NULL;
 	}
-
-	fs_mgmt_register_group();
 
 	return (avs_stream_t *)&provision_stream;
 }

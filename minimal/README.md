@@ -11,6 +11,7 @@ This folder contains LwM2M Client minimal application example for following targ
  - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
  - [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)
  - [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html)
+ - [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
  - [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)
 
 The following LwM2M Objects are supported:
@@ -29,7 +30,7 @@ west update
 
 You can now compile the project using `west build -b <target>` in `minimal` directory.
 
-### Compilation guide for nRF9160DK, Thingy:91, nRF52840DK and Arduino Nano 33 BLE Sense
+### Compilation guide for nRF9160DK, Thingy:91, nRF7002DK, nRF52840DK and Arduino Nano 33 BLE Sense
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/minimal`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -38,7 +39,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 
 > **__NOTE:__**

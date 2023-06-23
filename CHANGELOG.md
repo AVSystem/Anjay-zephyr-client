@@ -1,5 +1,23 @@
 # Changelog
 
+## 23.06 (June 23rd, 2023)
+
+### Features
+- Added support for nRF7002DK board
+
+### Improvements
+- Updated Zephyr to 3.3.0
+- Updated sdk-nrf to 2.3.0
+- Updated Anjay-zephyr to 3.4.1
+- Adjusted partition layout and MCUboot configuration on nRF9160DK builds to
+  support newer version of sdk-nrf
+- Added overlay for nRF9160DK in demo application which enables experimental Advanced Firmware Update object (/33629)
+
+### Bugfixes
+- Fixed firmware update on Thingy:91 - made sure that enough free space is left
+  on the flash partition for MCUboot's move algorithm to work
+- Fixed runtime certificate configuration on nRF52840 based boards
+
 ## 23.02 (Feb 21st, 2023)
 
 ### Features

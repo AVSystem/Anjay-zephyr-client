@@ -26,6 +26,8 @@ The following examples are present:
         <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
         <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk">nRF52840 Development kit</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK">nRF7002 Development kit</a><br>
         <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
         any other board of your choice (by adding appropriate <code>*.conf</code>/<code>*.overlay</code> files). FOTA support for selected boards.
       </td>
@@ -39,6 +41,7 @@ The following examples are present:
         <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
         <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk">nRF52840 Development kit</a><br>
         <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
       </td>
     </tr>

@@ -33,6 +33,8 @@ if(CONFIG_PARTITION_MANAGER_ENABLED)
 
         message(FATAL_ERROR "${pm_missing_message}")
     endif()
+
+    set(FOTA_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/zephyr/app_update.bin")
 elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
     if("${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}" STREQUAL "")
         if(NOT CONFIG_MCUBOOT_GENERATE_UNSIGNED_IMAGE)
@@ -81,13 +83,24 @@ elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
                                "${CMAKE_CURRENT_BINARY_DIR}/mcuboot/zephyr/zephyr.hex"
                                "${CMAKE_CURRENT_BINARY_DIR}/zephyr/zephyr.signed.hex"
                        DEPENDS mcuboot zephyr_final)
-    add_custom_target(mergehex ALL DEPENDS "${MERGED_HEX_NAME}")
+    add_custom_target(merged_hex ALL DEPENDS "${MERGED_HEX_NAME}")
 
     if(TARGET runners_yaml_props_target)
         get_target_property(RUNNERS_YAML_CONTENTS runners_yaml_props_target yaml_contents)
         string(REGEX REPLACE "zephyr[a-zA-Z0-9._-]*[.]hex" "merged.hex" RUNNERS_YAML_CONTENTS "${RUNNERS_YAML_CONTENTS}")
         set_property(TARGET runners_yaml_props_target PROPERTY yaml_contents "${RUNNERS_YAML_CONTENTS}")
     endif()
+
+    set(FOTA_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/zephyr/zephyr.signed.bin")
+endif()
+
+if(CONFIG_ANJAY_ZEPHYR_FOTA AND DEFINED FOTA_BINARY_FILE AND TARGET merged_hex)
+    # NOTE: Condider removing this (and the validate_fota_file_size.py script
+    # itself) when https://github.com/nrfconnect/sdk-mcuboot/pull/185 is merged
+    add_custom_target(validate_fota_file_size ALL DEPENDS merged_hex
+                      COMMAND "${PYTHON_EXECUTABLE}"
+                              "${CMAKE_CURRENT_SOURCE_DIR}/../tools/validate_fota_file_size.py"
+                              "${FOTA_BINARY_FILE}")
 endif()
 
 if(CONFIG_ANJAY_ZEPHYR_FACTORY_PROVISIONING_INITIAL_FLASH)

@@ -35,15 +35,19 @@ class ZephyrAdapterCommon:
     def prepare_device(self):
         self.flash_device()
 
+        if self.config["type"] == "demo":
+            self.prepare_device_demo()
+
+        self.skip_until("registration successful")
+        print("Device successfully registered")
+
+    def prepare_device_demo(self):
         self.skip_until("Initializing Anjay-zephyr-client demo")
         self.skip_until_prompt()
         print("Prompt message received, configuring...")
 
         self.__write_options()
         print("Device configured, waiting for connection...")
-
-        self.skip_until("registration successful")
-        print("Device successfully registered")
 
     @contextlib.contextmanager
     def __override_timeout(self, timeout):

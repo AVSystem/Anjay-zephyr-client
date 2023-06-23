@@ -96,7 +96,6 @@ void main(void)
 	anjay_zephyr_lwm2m_init_from_settings();
 	anjay_zephyr_lwm2m_start();
 
-	while (1) {
-		k_sleep(K_SECONDS(1));
-	}
+	// Anjay runs in a separate thread and preceding function doesn't block
+	// add your own code here
 }

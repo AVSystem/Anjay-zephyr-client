@@ -41,6 +41,24 @@ static const anjay_dm_object_def_t **switch_obj;
 #endif // SWITCH_AVAILABLE_ANY
 static avs_sched_handle_t update_objects_handle;
 
+#if LIGHT_CONTROL_AVAILABLE_ANY
+static const struct gpio_dt_spec leds[] = {
+#if LIGHT_CONTROL_AVAILABLE(0)
+	GPIO_DT_SPEC_GET(LIGHT_CONTROL_NODE(0), gpios),
+#endif // LIGHT_CONTROL_AVAILABLE(0)
+#if LIGHT_CONTROL_AVAILABLE(1)
+	GPIO_DT_SPEC_GET(LIGHT_CONTROL_NODE(1), gpios),
+#endif // LIGHT_CONTROL_AVAILABLE(1)
+#if LIGHT_CONTROL_AVAILABLE(2)
+	GPIO_DT_SPEC_GET(LIGHT_CONTROL_NODE(2), gpios),
+#endif // LIGHT_CONTROL_AVAILABLE(2)
+#if LIGHT_CONTROL_AVAILABLE(3)
+	GPIO_DT_SPEC_GET(LIGHT_CONTROL_NODE(3), gpios),
+#endif // LIGHT_CONTROL_AVAILABLE(3)
+};
+static const anjay_dm_object_def_t **light_control_obj;
+#endif // LIGHT_CONTROL_AVAILABLE_ANY
+
 #if PUSH_BUTTON_AVAILABLE_ANY
 static struct anjay_zephyr_ipso_button_instance buttons[] = {
 #if PUSH_BUTTON_AVAILABLE(0)
@@ -98,6 +116,13 @@ static int register_objects(anjay_t *anjay)
 		anjay_register_object(anjay, led_color_light_obj);
 	}
 #endif // LED_COLOR_LIGHT_AVAILABLE
+
+#if LIGHT_CONTROL_AVAILABLE_ANY
+	light_control_obj = anjay_zephyr_light_control_object_create(leds, AVS_ARRAY_SIZE(leds));
+	if (light_control_obj) {
+		anjay_register_object(anjay, light_control_obj);
+	}
+#endif // LIGHT_CONTROL_AVAILABLE_ANY
 
 #if SWITCH_AVAILABLE_ANY
 	switch_obj = anjay_zephyr_switch_object_create(switches, AVS_ARRAY_SIZE(switches));
@@ -170,6 +195,9 @@ static int release_objects(void)
 #if LED_COLOR_LIGHT_AVAILABLE
 	anjay_zephyr_led_color_light_object_release(&led_color_light_obj);
 #endif // LED_COLOR_LIGHT_AVAILABLE
+#if LIGHT_CONTROL_AVAILABLE_ANY
+	anjay_zephyr_light_control_object_release(&light_control_obj);
+#endif // LIGHT_CONTROL_AVAILABLE_ANY
 #if BUZZER_AVAILABLE
 	anjay_zephyr_buzzer_object_release(&buzzer_obj);
 #endif // BUZZER_AVAILABLE
@@ -201,7 +229,6 @@ void main(void)
 	anjay_zephyr_lwm2m_init_from_settings();
 	anjay_zephyr_lwm2m_start();
 
-	while (1) {
-		k_sleep(K_SECONDS(1));
-	}
+	// Anjay runs in a separate thread and preceding function doesn't block
+	// add your own code here
 }

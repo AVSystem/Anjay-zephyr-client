@@ -7,10 +7,10 @@ EMPTY_0:
   region: flash_primary
   size: 0x6000
 app:
-  address: 0x1c200
+  address: 0x18000
   end_address: 0xe8000
   region: flash_primary
-  size: 0xcbe00
+  size: 0xd0000
 external_flash:
   address: 0xd8000
   end_address: 0x800000
@@ -74,6 +74,15 @@ mcuboot_secondary:
   share_size:
   - mcuboot_primary
   size: 0xd8000
+dfu_target_fmfu:
+  address: 0xd8000
+  device: DT_CHOSEN(nordic_pm_ext_flash)
+  end_address: 0x2d8000
+  placement:
+    after:
+    - mcuboot_secondary
+  region: external_flash
+  size: 0x200000
 nonsecure_storage:
   address: 0xfe000
   end_address: 0x100000
@@ -97,20 +106,20 @@ settings_storage:
   size: 0x2000
 tfm:
   address: 0x10200
-  end_address: 0x1c200
+  end_address: 0x18000
   inside:
   - mcuboot_primary_app
   placement:
     before:
     - app
   region: flash_primary
-  size: 0xc000
+  size: 0x7e00
 tfm_secure:
   address: 0x10000
-  end_address: 0x1c200
+  end_address: 0x18000
   orig_span: &id004
   - mcuboot_pad
   - tfm
   region: flash_primary
-  size: 0xc200
+  size: 0x8000
   span: *id004
