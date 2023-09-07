@@ -1,0 +1,17 @@
+/ {
+    aliases {
+        temperature = &as6212;
+        accelerometer = &lis2dw12;
+        barometer = &lps22hh;
+        push-button-0 = &button0;
+        status-led = &led1;
+        illuminance = &tsl2540;
+    };
+    chosen {
+        zephyr,code-partition = &slot0_partition;
+        zephyr,console = &usart0;
+        zephyr,shell-uart = &usart0;
+    };
+};
+
+#include "tmo_dev_edge_partitions.overlay"

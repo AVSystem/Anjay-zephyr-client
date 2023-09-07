@@ -29,6 +29,7 @@ The following examples are present:
         <a href="https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk">nRF52840 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK">nRF7002 Development kit</a><br>
         <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
+        <a href="https://devedge.t-mobile.com/solutions/iotdevkit">DevEdge</a><br>
         any other board of your choice (by adding appropriate <code>*.conf</code>/<code>*.overlay</code> files). FOTA support for selected boards.
       </td>
     </tr>
@@ -43,6 +44,7 @@ The following examples are present:
         <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk">nRF52840 Development kit</a><br>
         <a href="https://store.arduino.cc/products/arduino-nano-33-ble-sense">Arduino Nano 33 BLE Sense Lite</a><br>
+        <a href="https://devedge.t-mobile.com/solutions/iotdevkit">DevEdge</a><br>
       </td>
     </tr>
     <tr>
@@ -50,6 +52,14 @@ The following examples are present:
       <td>
         An example containing motion recognition model, built with Edge Impulse. Supported boards/targets:<br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a>
+      </td>
+    </tr>
+    <tr>
+      <td>bubblemaker/</td>
+      <td>
+        An interactive example containing integration of water meters and different sensors with LwM2M protocol.  Supported boards:<br>
+        <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
+        <a href="https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK">nRF7002 Development kit</a><br>
       </td>
     </tr>
   </tbody>
@@ -136,6 +146,24 @@ configuration for the desired target, e.g. `nrf9160dk_nrf9160_ns` (you can have
 multiple configurations for different targets). Choose your target and click
 "Build Configuration" in order to build the application. Next builds can be
 started by choosing Actions -> Build.
+
+### Enabling GPS implementation (for nRF9160 targets)
+
+Anjay-zephyr-client has the support for GPS implementation for nRF9160 targets
+which can be enabled using `Kconfig` options. Some of the available options are:
+- `CONFIG_ANJAY_ZEPHYR_GPS` - enables/disables support for GPS
+- `CONFIG_ANJAY_ZEPHYR_GPS_NRF_A_GPS` - enables/disables A-GPS using Nordic
+Location Services over LwM2M
+- `CONFIG_ANJAY_ZEPHYR_GPS_NRF_PRIO_MODE_PERMITTED` - enables/disables support
+for allowing temporary activation of the GPS priority mode
+  - if set, Anjay Zephyr will temporarily activate the GPS priority over LTE
+  idle mode **which shuts down LTE completely** and attempts to acquire the fix
+  in case GPS fix cannot be produced
+  - by default, this option is disabled and can be enabled using `Kconfig` or
+  shell commands (`anjay config set gps_prio_mode_permitted`)
+- `CONFIG_ANJAY_ZEPHYR_GPS_NRF_PRIO_MODE_COOLDOWN` - determines (in seconds) how
+much time must pass after a failed try to produce a GPS fix to enable GPS
+priority mode again
 
 ## Connecting to the LwM2M Server
 

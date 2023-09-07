@@ -1,0 +1,141 @@
+#include <zephyr/dt-bindings/led/led.h>
+#include "nrf_led_strip_bindings.h"
+
+/ {
+    aliases {
+        push-button-0 = &button0;
+        push-button-1 = &button1;
+        switch-0 = &button2;
+        switch-1 = &button3;
+        status-led = &led0;
+        temperature-0 = &ds18b200;
+        temperature-1 = &ds18b201;
+        led-strip = &led_strip;
+        water-meter-0 = &water_meter0;
+        water-meter-1 = &water_meter1;
+        //water-pump-0 = &water_pump0;
+    };
+    zephyr,user {
+        /* these settings act as aliases for ADC sensors */
+        io-channels = <&adc 0>, <&adc 1>, <&adc 2>, <&adc 3>;
+        io-channel-names = "pressure0", "pressure1", "acidity0", "acidity1";
+    };
+    water_meters {
+        compatible = "gpio-keys";
+        water_meter0: water_meter_0 {
+            gpios = <&gpio0 20 GPIO_ACTIVE_LOW>;
+        };
+        water_meter1: water_meter_1 {
+            gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
+        };
+    };
+    water_pumps {
+        compatible = "gpio-keys";
+        water_pump0: water_pump_0 {
+            gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+        };
+    };
+};
+
+&arduino_spi {
+    compatible = "nordic,nrf-spim";
+    led_strip: ws2812@0 {
+        compatible = "worldsemi,ws2812-spi";
+
+        /* SPI */
+        reg = <0>; /* ignored, but necessary for SPI bindings */
+        spi-max-frequency = <SPI_FREQ>;
+
+        /* WS2812 */
+        chain-length = <32>; /* arbitrary; change at will */
+        color-mapping = <LED_COLOR_ID_GREEN
+                 LED_COLOR_ID_RED
+                 LED_COLOR_ID_BLUE>;
+        spi-one-frame = <ONE_FRAME>;
+        spi-zero-frame = <ZERO_FRAME>;
+    };
+};
+
+&adc {
+   #address-cells = <1>;
+   #size-cells = <0>;
+
+   channel@0 {
+       reg = <0>;
+       zephyr,gain = "ADC_GAIN_1_6";
+       zephyr,reference = "ADC_REF_INTERNAL";
+       zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+       zephyr,resolution = <12>;
+       zephyr,input-positive = <NRF_SAADC_AIN3>;
+       zephyr,oversampling = <8>;
+   };
+
+   channel@1 {
+       reg = <1>;
+       zephyr,gain = "ADC_GAIN_1_6";
+       zephyr,reference = "ADC_REF_INTERNAL";
+       zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+       zephyr,resolution = <12>;
+       zephyr,input-positive = <NRF_SAADC_AIN4>;
+       zephyr,oversampling = <8>;
+   };
+
+   channel@2 {
+       reg = <2>;
+       zephyr,gain = "ADC_GAIN_1_6";
+       zephyr,reference = "ADC_REF_INTERNAL";
+       zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+       zephyr,resolution = <12>;
+       zephyr,input-positive = <NRF_SAADC_AIN5>;
+       zephyr,oversampling = <8>;
+   };
+
+   channel@3 {
+       reg = <3>;
+       zephyr,gain = "ADC_GAIN_1_6";
+       zephyr,reference = "ADC_REF_INTERNAL";
+       zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+       zephyr,resolution = <12>;
+       zephyr,input-positive = <NRF_SAADC_AIN6>;
+       zephyr,oversampling = <8>;
+   };
+};
+
+&uart1 {
+    status = "okay";
+
+    w1: w1-zephyr-serial-0 {
+        compatible = "zephyr,w1-serial";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        status = "okay";
+
+        ds18b200: ds18b20_0 {
+            compatible = "maxim,ds18b20";
+            family-code = <0x28>;
+            resolution = <12>;
+            status = "okay";
+        };
+        ds18b201: ds18b20_1 {
+            compatible = "maxim,ds18b20";
+            family-code = <0x28>;
+            resolution = <12>;
+            status = "okay";
+        };
+    };
+};
+
+&pinctrl {
+    uart1_default: uart1_default {
+        group1 {
+            psels = <NRF_PSEL(UART_TX, 0, 1)>,
+                <NRF_PSEL(UART_RTS, 0, 27)>;
+            nordic,drive-mode = <NRF_DRIVE_H0D1>;
+        };
+        group2 {
+            psels = <NRF_PSEL(UART_RX, 0, 0)>,
+                <NRF_PSEL(UART_CTS, 0, 26)>;
+            bias-pull-up;
+        };
+    };
+};

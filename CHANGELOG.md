@@ -1,5 +1,12 @@
 # Changelog
 
+## 23.09 (September 7th, 2023)
+
+### Features
+- Added Bubblemaker app
+- Added tmo_dev_edge board as a target for demo and minimal samples with the possibility to switch
+  preferred network bearer and perform firmware update using the external flash
+
 ## 23.06 (June 23rd, 2023)
 
 ### Features
@@ -10,7 +17,7 @@
 - Updated sdk-nrf to 2.3.0
 - Updated Anjay-zephyr to 3.4.1
 - Adjusted partition layout and MCUboot configuration on nRF9160DK builds to
-  support newer version of sdk-nrf
+  support the newer version of sdk-nrf
 - Added overlay for nRF9160DK in demo application which enables experimental Advanced Firmware Update object (/33629)
 
 ### Bugfixes

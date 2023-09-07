@@ -1,0 +1,30 @@
+&flash0 {
+    partitions {
+        boot_partition: partition@0 {
+            label = "mcuboot";
+            reg = <0x00000000 DT_SIZE_K(48)>;
+        };
+        slot0_partition: partition@C000 {
+            label = "image-0";
+            reg = <0x0000C000 DT_SIZE_K(936)>;
+        };
+        scratch_partition: partition@F6000 {
+            label = "image-scratch";
+            reg = <0x000F6000 DT_SIZE_K(32)>;
+        };
+    };
+};
+
+&w25q64 {
+    partitions {
+        // This overrides the default configuration which configures it as 8MiB
+        storage_partition1: partition@0 {
+            label = "storage";
+            reg = <0x00000000 DT_SIZE_K(7256)>;
+        };
+        slot1_partition: partition@716000 {
+            label = "image-1";
+            reg = <0x00716000 DT_SIZE_K(936)>;
+        };
+    };
+};

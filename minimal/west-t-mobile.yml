@@ -17,23 +17,20 @@ manifest:
   remotes:
   - name: anjay
     url-base: https://github.com/AVSystem
-  - name: zephyrproject-rtos
-    url-base: https://github.com/zephyrproject-rtos
+  - name: t-mobile
+    url-base: https://github.com/tmobile
   projects:
-  - name: zephyr
+  - name: DevEdge-IoTDevKit-ZephyrRTOS
     path: zephyr
-    remote: zephyrproject-rtos
-    revision: v3.3.0
+    remote: t-mobile
+    revision: tmz-1.19.2-qa
     import: true
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
     revision: 5.4.0
     path: modules/lib/anjay
-  - name: hal_espressif
-    path: modules/hal/espressif
-    remote: zephyrproject-rtos
-    revision: 2d505773ef94ff3c7b5facf43eb78d7c563720f1
-    west-commands: west/west-commands.yml
-    groups:
-    - hal
+  - name: DevEdge-IoTDevKit-ZephyrSDK
+    path: modules/lib/t-mobile-sdk
+    remote: t-mobile
+    revision: tmz-sdk-1.19.2-qa

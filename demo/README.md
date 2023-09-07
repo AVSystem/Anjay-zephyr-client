@@ -4,7 +4,7 @@ Project containing all implemented features, intended to be a showcase.
 ## Supported hardware and overview
 
 This folder contains LwM2M Client application example, which targets
-[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk), [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK) and [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense).
+[B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk), [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK), [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense) and [DevEdge](https://devedge.t-mobile.com/solutions/iotdevkit).
 
 There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
 
@@ -18,6 +18,7 @@ The following LwM2M Objects are supported by default:
 | B-L475E-IOT01A | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347) |
 | nRF9160DK | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
 | Thingy:91 | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
+| DevEdge | **Firmware Update (/5)**<br>Location (/6)<br>Illuminance (/3301)<br>Temperature (/3303)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Push button (/3347) |
 | nRF52840DK | Push button (/3347) |
 | nRF7002DK | Light Control (/3311)<br>Push button (/3347) |
 | Arduino Nano 33 BLE Sense Lite | Temperature (/3303)<br>Barometer (/3315) |
@@ -46,6 +47,16 @@ west update
 ```
 Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
+### Compilation guide for T-Mobile DevEdge
+
+Because T-Mobile DevEdge board uses fork of Zephyr, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
+Set West manifest path to `Anjay-zephyr-client/demo`, and manifest file to `west-t-mobile.yml` and do `west update`.
+```
+west config manifest.path Anjay-zephyr-client/demo
+west config manifest.file west-t-mobile.yml
+west update
+```
+Now you can compile the project using `west build -b tmo_dev_edge` in `demo` directory.
 
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.
@@ -55,6 +66,52 @@ Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `wes
 > ```
 > [More about managing west workspace through manifests can be found here.](https://docs.zephyrproject.org/latest/guides/west/manifest.html)
 
+> **__NOTE:__**
+> For proper support of the cellular connection, you may need to set the right value of CONFIG_MODEM_MURATA_1SC_APN in `tmo_dev_edge.conf` file beforehand.
+
+
+> **__NOTE:__**
+> On the DevEdge board, you may need to perform a full chip erase for the firmware update (which is implemented using the external flash) to work properly. This will require flashing the UART bootloader again. You can download it from the Silicon Labs site: go to http://www.silabs.com/32bit-appnotes, search for "AN0003: UART Bootloader" and download the "Example Code" resource, and flash the `an/an0003_efm32_uart_bootloader/binaries/bl-usart-geckoS1C2-v2.07.hex` file using JLink Programmer.
+
+#### GPS/GNSS location support on T-Mobile DevEdge
+
+Some T-Mobile DevEdge board units may be delivered without any firmware installed on the CXD5605AGF chip that is used as GPS/GNSS receiver.
+
+If you have one of those units, you need to flash the firmware manually using the applications from the T-Mobile DevEdge SDK.
+
+1. Navigate to the `samples/cxd5605_test` application within the T-Mobile DevEdge SDK.
+
+   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * Observe the serial port output.
+
+     * If it regularly shows NMEA sequences such as `$GPGGA,000001.00,,,,,0,00,,,,,,,*49`, *the firmware is OK and the Location object should work in the Anjay client.*
+     * Otherwise, if the output stops at `Reading NMEA sentences`, the firmware is not present in the chip. If you wish the Location object to work, please follow the rest of the steps.
+
+2. Navigate to the `samples/cxd5605_load_fw_to_flash` application within the T-Mobile DevEdge SDK.
+
+   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * *NOTE: This will overwrite any non-volatile configuration of the Anjay client.*
+   * Observe the serial port output. Wait until the application prints `Verification of flash done`. This should take about 30 seconds since boot.
+   * The CXD5605AGF firmware is now loaded onto the external flash. You can proceed with the next step to flash it onto the actual chip.
+
+3. Navigate to the `samples/cxd5605_update_fw` application within the T-Mobile DevEdge SDK.
+
+   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * The firmware consists of 4 files. Wait until the application flashes all of them.
+   * Observe the serial port output. When the whole procedure is finished, the application will print the firmware version number (e.g. `Ver: 20047,2f945cd,136E`). This should take about 3-4 minutes since boot.
+   * The CXD5605AGF firmware is now flashed.
+
+4. Repeat step 1 to verify that the receiver is working properly.
+
+5. You can now proceed with building and flashing the Anjay client. The Location object shall now work properly, provided that the GPS/GNSS signal is strong enough. Note that this may be impossible when the board is used inside a building.
+
+#### Switching the preferred network bearer
+
+On the T-Mobile DevEdge board, both WiFi and cellular connectivity is supported and can be switched at runtime.
+
+To select the currently active connection, please type `anjay config set preferred_bearer wifi` or `anjay config set preferred_bearer cellular`, respectively, on the serial console. The change will take effect immediately - although it is recommended to disable the LwM2M client first (`anjay stop`). Changing the network bearer while connected may result in spurious error messages printed on the console.
+
+The preferred bearer can be saved onto persistent storage (among other settings) by typing `anjay config save`.
 
 ### Compiling for external flash usage
 
@@ -195,11 +252,10 @@ west build -b nrf9160dk_nrf9160_ns@0.14.0 -p -- -DCONF_FILE=prj_extflash.conf -D
 After that, certificate and private key based on SECP256R1 curve can be provided through shell interface in PEM format. To generate them use following commands (to use certificate and private key with Coiote DM you must specify a common name that is the same as the client endpoint name):
 ```
 openssl ecparam -name secp256r1 -out ecparam.der
-openssl req -new -x509 -nodes -newkey ec:ecparam.der -keyout demo-cert.key -out demo-cert.crt -days 3650
-openssl x509 -in demo-cert.crt -outform pem -out cert.pem
+openssl req -new -x509 -nodes -newkey ec:ecparam.der -keyout demo-cert.key -out cert.pem -days 3650
 openssl ec -in demo-cert.key -outform pem -out key.pem
 ```
-Then provide the generated certificate and private key through the shell with the following commands respectively:
+Then provide the generated certificate (cert.pem) and private key (key.pem) through the shell with the following commands respectively:
 ```
 anjay config set public_cert
 anjay config set private_key
