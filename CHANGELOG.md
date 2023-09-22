@@ -1,5 +1,10 @@
 # Changelog
 
+## 23.09.1 (September 22nd, 2023)
+
+### Bugfixes
+- Fix Anjay-zephyr revision in west*.yml files
+
 ## 23.09 (September 7th, 2023)
 
 ### Features
