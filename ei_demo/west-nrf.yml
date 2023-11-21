@@ -23,10 +23,10 @@ manifest:
   - name: sdk-nrf
     path: nrf
     remote: ncs
-    revision: v2.3.0
+    revision: v2.5.0
     import: true
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
-    revision: 3.5.0
+    revision: 3.6.1
     path: modules/lib/anjay

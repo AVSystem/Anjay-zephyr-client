@@ -1,5 +1,12 @@
 # Changelog
 
+## 23.11 (November 21st, 2023)
+
+### Improvements
+- Updated Zephyr to 3.5.0
+- Updated sdk-nrf to 2.5.0
+- Adjusted Kconfig options to make projects build on newest Zephyr and nCS versions
+
 ## 23.09.1 (September 22nd, 2023)
 
 ### Bugfixes
@@ -11,6 +18,7 @@
 - Added Bubblemaker app
 - Added tmo_dev_edge board as a target for demo and minimal samples with the possibility to switch
   preferred network bearer and perform firmware update using the external flash
+- Added support for Location object in `asset_tracker` application
 
 ## 23.06 (June 23rd, 2023)
 
