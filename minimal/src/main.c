@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,12 @@
 #include <anjay_zephyr/lwm2m.h>
 #include <anjay_zephyr/objects.h>
 
-void main(void)
+int main(void)
 {
 	anjay_zephyr_lwm2m_init_from_settings();
 	anjay_zephyr_lwm2m_start();
 
 	// Anjay runs in a separate thread and preceding function doesn't block
 	// add your own code here
+	return 0;
 }

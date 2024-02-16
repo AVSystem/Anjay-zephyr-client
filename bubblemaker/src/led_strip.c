@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,8 @@
 #include "led_strip.h"
 #include "bubblemaker.h"
 #include "water_meter.h"
+
+#if LED_STRIP_AVAILABLE
 
 LOG_MODULE_REGISTER(led_strip);
 
@@ -193,3 +195,5 @@ int led_strip_init(void)
 
 	return 0;
 }
+
+#endif // LED_STRIP_AVAILABLE

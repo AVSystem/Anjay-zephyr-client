@@ -40,7 +40,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 ### Compilation guide for T-Mobile DevEdge
 

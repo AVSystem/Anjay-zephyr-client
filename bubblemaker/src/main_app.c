@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -186,7 +186,7 @@ int lwm2m_callback(anjay_t *anjay, enum anjay_zephyr_lwm2m_callback_reasons reas
 	}
 }
 
-void main(void)
+int main(void)
 {
 	LOG_INF("Initializing Anjay-zephyr-client Bubblemaker " CONFIG_ANJAY_ZEPHYR_VERSION);
 
@@ -197,4 +197,5 @@ void main(void)
 
 	// Anjay runs in a separate thread and preceding function doesn't block
 	// add your own code here
+	return 0;
 }

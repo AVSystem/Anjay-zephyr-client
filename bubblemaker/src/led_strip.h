@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,4 +16,9 @@
 
 #pragma once
 
+#define LED_STRIP_NODE DT_ALIAS(led_strip)
+#define LED_STRIP_AVAILABLE DT_NODE_HAS_STATUS(LED_STRIP_NODE, okay)
+
+#if LED_STRIP_AVAILABLE
 int led_strip_init(void);
+#endif // LED_STRIP_AVAILABLE

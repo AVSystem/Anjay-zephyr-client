@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,7 +98,7 @@ def get_images(args):
     return initial_image, final_image
 
 
-def get_device_adapter(serial_number, baudrate):
+def get_device_adapter(serial_number, baudrate, vcom):
     sys.path.append(os.path.join(os.path.dirname(
         os.path.realpath(__file__)), '../board_adapters'))
     adapter_module = importlib.import_module('nrf_adapter')
@@ -106,6 +106,7 @@ def get_device_adapter(serial_number, baudrate):
     config = {
         'nrfjprog-serial': serial_number,
         'baudrate': str(baudrate),
+        'vcom': vcom,
         'timeout': 60,
         'hex-path': None,
         'passthrough': False
@@ -195,6 +196,9 @@ def main():
     parser.add_argument('-B', '--baudrate', type=int,
                         help='Baudrate for the used serial port',
                         required=False, default=115200)
+    parser.add_argument('-v', '--vcom', type=str,
+                        help='Virtual serial port to which the logs from the device are printed',
+                        required=False, default='VCOM0')
 
     # Arguments for factory_provisioning library
     parser.add_argument('-c', '--endpoint_cfg', type=str,
@@ -239,7 +243,7 @@ def main():
 
     print('Zephyr Images ready!')
 
-    adapter = get_device_adapter(args.serial, args.baudrate)
+    adapter = get_device_adapter(args.serial, args.baudrate, args.vcom)
     flash_device(adapter, initial_image, True,
                  'Device ready for provisioning.')
 

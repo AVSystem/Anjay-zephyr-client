@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -431,6 +431,10 @@ void basic_sensor_objects_install(anjay_t *anjay)
 {
 	for (int i = 0; i < AVS_ARRAY_SIZE(basic_sensors_def); i++) {
 		struct sensor_context *ctx = &basic_sensors_def[i];
+
+		if (ctx->instances_count == 0) {
+			continue;
+		}
 
 		if (anjay_ipso_basic_sensor_install(anjay, ctx->oid, ctx->instances_count)) {
 			continue;

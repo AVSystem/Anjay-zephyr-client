@@ -45,7 +45,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 ### Compilation guide for T-Mobile DevEdge
 
@@ -123,7 +123,7 @@ To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0
 
 On Nordic boards, security is provided using the (D)TLS sockets implemented in modem firmware and provided by nrfxlib.
 
-However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites) that are not supported by the modem.
+However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites and DTLS Connection ID support) that are not supported by the modem.
 
 To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG=overlay_nrf_mbedtls.conf`.
 
@@ -294,6 +294,7 @@ There are a few new and important command-line arguments:
 * `--image_dir` (`-i`) - directory for the cached Zephyr hex images,
 * `--serial` (`-s`) - serial number of the device to be used,
 * `--baudrate` (`-B`) - baudrate for the used serial port, when it is not provided the default value is 115200,
+* `--vcom` (`-v`) - virtual serial port to which the logs from the device are printed, by default `VCOM0` is used,
 * `--conf_file` (`-f`) - application configuration file(s) for final image build, by default, `prj.conf` is used.
 
 If the image `initial.hex` exists in the given `image_dir` the initial provisioning image won't be built and the same works for

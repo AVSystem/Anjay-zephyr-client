@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+ * Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -97,7 +97,10 @@ int bubblemaker_init(void)
 {
 	LOG_INF("Initializing Bubblemaker");
 
-	if (led_strip_init() || water_meter_init()
+	if (water_meter_init()
+#if LED_STRIP_AVAILABLE
+	    || led_strip_init()
+#endif // LED_STRIP_AVAILABLE
 #if WATER_PUMP_0_AVAILABLE
 	    || water_pump_initialize()
 #endif // WATER_PUMP_0_AVAILABLE

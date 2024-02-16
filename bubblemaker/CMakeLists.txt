@@ -1,4 +1,4 @@
-# Copyright 2020-2023 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,19 +19,23 @@ project(anjay_zephyr_demo)
 set(root_dir ${ANJAY_ZEPHYR_CLIENT_DIR})
 
 if(CONFIG_PARTITION_MANAGER_ENABLED)
-    # defined in nrf/cmake/partition_manager.cmake
-    if(NOT EXISTS "${static_configuration_file}")
-        set(pm_missing_message "Missing static partition manager file for board: ${BOARD}")
+    if(CONFIG_ANJAY_ZEPHYR_FOTA)
+        # defined in nrf/cmake/partition_manager.cmake
+        if(NOT EXISTS "${static_configuration_file}")
+            set(pm_missing_message "Missing static partition manager file for board: ${BOARD}")
 
-        if(ACTIVE_BOARD_REVISION)
-            set(pm_missing_message "${pm_missing_message}, rev: ${ACTIVE_BOARD_REVISION}")
+            if(ACTIVE_BOARD_REVISION)
+                set(pm_missing_message "${pm_missing_message}, rev: ${ACTIVE_BOARD_REVISION}")
+            endif()
+
+            if(CONF_FILE_BUILD_TYPE)
+                set(pm_missing_message "${pm_missing_message}, build type: ${CONF_FILE_BUILD_TYPE}")
+            endif()
+
+            message(FATAL_ERROR "${pm_missing_message}")
         endif()
 
-        if(CONF_FILE_BUILD_TYPE)
-            set(pm_missing_message "${pm_missing_message}, build type: ${CONF_FILE_BUILD_TYPE}")
-        endif()
-
-        message(FATAL_ERROR "${pm_missing_message}")
+        set(FOTA_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/zephyr/app_update.bin")
     endif()
 elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
     if("${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}" STREQUAL "")
