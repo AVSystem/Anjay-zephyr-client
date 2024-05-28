@@ -1,11 +1,18 @@
 # Changelog
 
+## 24.05 (May 28th, 2024)
+
+### Improvements
+- Adjusted `nrf9160dk_nrf9160_ns` build to meet new default target
+- Reworked build system to use `sysbuild` for FOTA builds on upstream Zephyr and T-Mobile SDKs
+
 ## 24.02 (February 16th, 2024)
 
 ### Improvements
 - Changed C stdlib to Picolibc (Zephyr's default) for most projects
 - Added TF-M support for nRF7002 DK board (changed the board variant from `nrf7002dk_nrf5340_cpuapp` to `nrf7002dk_nrf5340_cpuapp_ns`)
 - Added new parameter to specify log virtual port for factory provisioning script
+- Updated Zephyr SDK to 0.16.4
 
 ## 23.11 (November 21st, 2023)
 

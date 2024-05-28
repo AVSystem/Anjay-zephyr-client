@@ -35,62 +35,6 @@ if(CONFIG_PARTITION_MANAGER_ENABLED)
             message(FATAL_ERROR "${pm_missing_message}")
         endif()
 
-        set(FOTA_BINARY_FILE "${CMAKE_CURRENT_BINARY_DIR}/zephyr/app_update.bin")
-    endif()
-elseif(CONFIG_ANJAY_CLIENT_BUILD_MCUBOOT_AUTOMATICALLY)
-    if("${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}" STREQUAL "")
-        if(NOT CONFIG_MCUBOOT_GENERATE_UNSIGNED_IMAGE)
-            message(FATAL_ERROR "Either MCUBOOT_SIGNATURE_KEY_FILE or MCUBOOT_GENERATE_UNSIGNED_IMAGE need to be set in Kconfig")
-        endif()
-    else()
-        set(MCUBOOT_SIGNATURE_KEY_FILE "${CONFIG_MCUBOOT_SIGNATURE_KEY_FILE}")
-        if(NOT IS_ABSOLUTE "${MCUBOOT_SIGNATURE_KEY_FILE}")
-            set(MCUBOOT_SIGNATURE_KEY_FILE "${WEST_TOPDIR}/${MCUBOOT_SIGNATURE_KEY_FILE}")
-        endif()
-    endif()
-    make_directory("${CMAKE_CURRENT_BINARY_DIR}/mcuboot")
-    execute_process(COMMAND "${CMAKE_COMMAND}"
-                            -GNinja
-                            "-DAPPLICATION_CONFIG_DIR=${CMAKE_CURRENT_SOURCE_DIR}/child_image/mcuboot"
-                            "-DBOARD=${BOARD}"
-                            "-DCONF_FILE=${ZEPHYR_BASE}/../bootloader/mcuboot/boot/zephyr/prj.conf"
-                            "-DCONF_FILE_INCLUDE_FRAGMENTS=ON"
-                            "-DCONFIG_BOOT_SIGNATURE_KEY_FILE=\"${MCUBOOT_SIGNATURE_KEY_FILE}\""
-                            "-DDTC_OVERLAY_FILE=${CMAKE_CURRENT_SOURCE_DIR}/child_image/mcuboot/boards/${BOARD}.overlay"
-                            "${ZEPHYR_BASE}/../bootloader/mcuboot/boot/zephyr"
-                    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mcuboot"
-                    RESULT_VARIABLE MCUBOOT_CMAKE_RESULT)
-    if(NOT MCUBOOT_CMAKE_RESULT EQUAL 0)
-        message(FATAL_ERROR "Configuring MCUboot failed")
-    endif()
-
-    add_custom_target(mcuboot COMMAND "${CMAKE_COMMAND}" --build "${CMAKE_CURRENT_BINARY_DIR}/mcuboot")
-
-    # NOTE: This is largely copied from CMakeLists.txt in Zephyr itself.
-    # However, using that would require setting HEX_FILES_TO_MERGE *before*
-    # find_package(Zephyr), and we can't do that because we need to examine
-    # Kconfig variables, which are populated by find_package(Zephyr).
-    # That's why we do it ourselves here...
-    set(MERGED_HEX_NAME "${CMAKE_CURRENT_BINARY_DIR}/zephyr/merged.hex")
-    # In Zephyr 3.2, mergehex.py has been moved
-    # from scripts/mergehex.py to scripts/build/mergehex.py
-    set(MERGEHEX_SCRIPT "${ZEPHYR_BASE}/scripts/build/mergehex.py")
-    if(NOT EXISTS "${MERGEHEX_SCRIPT}")
-        set(MERGEHEX_SCRIPT "${ZEPHYR_BASE}/scripts/mergehex.py")
-    endif()
-    add_custom_command(OUTPUT "${MERGED_HEX_NAME}"
-                       COMMAND "${PYTHON_EXECUTABLE}"
-                               "${MERGEHEX_SCRIPT}"
-                               -o "${MERGED_HEX_NAME}"
-                               "${CMAKE_CURRENT_BINARY_DIR}/mcuboot/zephyr/zephyr.hex"
-                               "${CMAKE_CURRENT_BINARY_DIR}/zephyr/zephyr.signed.hex"
-                       DEPENDS mcuboot zephyr_final)
-    add_custom_target(mergehex ALL DEPENDS "${MERGED_HEX_NAME}")
-
-    if(TARGET runners_yaml_props_target)
-        get_target_property(RUNNERS_YAML_CONTENTS runners_yaml_props_target yaml_contents)
-        string(REGEX REPLACE "zephyr[a-zA-Z0-9._-]*[.]hex" "merged.hex" RUNNERS_YAML_CONTENTS "${RUNNERS_YAML_CONTENTS}")
-        set_property(TARGET runners_yaml_props_target PROPERTY yaml_contents "${RUNNERS_YAML_CONTENTS}")
     endif()
 endif()
 

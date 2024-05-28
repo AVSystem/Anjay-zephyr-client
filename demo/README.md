@@ -6,8 +6,6 @@ Project containing all implemented features, intended to be a showcase.
 This folder contains LwM2M Client application example, which targets
 [B-L475E-IOT01A Discovery kit](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html), [nRF9160 Development kit](https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK), [Nordic Thingy:91 Prototyping kit](https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91), [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc), [nRF52840 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk), [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK), [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense) and [DevEdge](https://devedge.t-mobile.com/solutions/iotdevkit).
 
-There's an alternative configuration for nRF9160DK, revisions 0.14.0 and up, which utilizes external flash chip to perform firmware updates.
-
 It's possible to run the demo on other boards of your choice, by adding appropriate configuration files and aliases for available sensors/peripherals (more info below).
 
 The following LwM2M Objects are supported by default:
@@ -34,7 +32,7 @@ west config manifest.file west.yml
 west update
 ```
 
-You can now compile the project for B-L475E-IOT01A using `west build -b disco_l475_iot1` in `demo` directory.
+You can now compile the project for B-L475E-IOT01A using `west build -b disco_l475_iot1 --sysbuild` in `demo` directory.
 
 ### Compilation guide for nRF9160DK, Thingy:91, nRF7002DK, nRF52840DK and Arduino Nano 33 BLE Sense
 
@@ -47,6 +45,8 @@ west update
 ```
 Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
+By default, building for `nrf9160dk_nrf9160_ns` target is intended for nRF9160DK hardware revision 0.14.0. In order to protect against further NCS updates, we can provide the revision explicitly, by calling `west build -b nrf9160dk_nrf9160_ns@0.14.0`.
+
 ### Compilation guide for T-Mobile DevEdge
 
 Because T-Mobile DevEdge board uses fork of Zephyr, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
@@ -56,7 +56,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-t-mobile.yml
 west update
 ```
-Now you can compile the project using `west build -b tmo_dev_edge` in `demo` directory.
+Now you can compile the project using `west build -b tmo_dev_edge --sysbuild` in `demo` directory.
 
 > **__NOTE:__**
 > To switch back to mainstream zephyr version, change manifest file to `west.yml` and do `west update`.
@@ -81,7 +81,7 @@ If you have one of those units, you need to flash the firmware manually using th
 
 1. Navigate to the `samples/cxd5605_test` application within the T-Mobile DevEdge SDK.
 
-   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * Build and flash it using `west build -b tmo_dev_edge --sysbuild && west flash`
    * Observe the serial port output.
 
      * If it regularly shows NMEA sequences such as `$GPGGA,000001.00,,,,,0,00,,,,,,,*49`, *the firmware is OK and the Location object should work in the Anjay client.*
@@ -89,14 +89,14 @@ If you have one of those units, you need to flash the firmware manually using th
 
 2. Navigate to the `samples/cxd5605_load_fw_to_flash` application within the T-Mobile DevEdge SDK.
 
-   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * Build and flash it using `west build -b tmo_dev_edge --sysbuild && west flash`
    * *NOTE: This will overwrite any non-volatile configuration of the Anjay client.*
    * Observe the serial port output. Wait until the application prints `Verification of flash done`. This should take about 30 seconds since boot.
    * The CXD5605AGF firmware is now loaded onto the external flash. You can proceed with the next step to flash it onto the actual chip.
 
 3. Navigate to the `samples/cxd5605_update_fw` application within the T-Mobile DevEdge SDK.
 
-   * Build and flash it using `west build -b tmo_dev_edge && west flash`
+   * Build and flash it using `west build -b tmo_dev_edge --sysbuild && west flash`
    * The firmware consists of 4 files. Wait until the application flashes all of them.
    * Observe the serial port output. When the whole procedure is finished, the application will print the firmware version number (e.g. `Ver: 20047,2f945cd,136E`). This should take about 3-4 minutes since boot.
    * The CXD5605AGF firmware is now flashed.
@@ -113,11 +113,9 @@ To select the currently active connection, please type `anjay config set preferr
 
 The preferred bearer can be saved onto persistent storage (among other settings) by typing `anjay config save`.
 
-### Compiling for external flash usage
+### Compiling for external and internal flash usage
 
-For nRF9160DK hardware revisions 0.14.0 and up, an alternate configuration that puts the MCUboot secondary partition on the external flash instead of dividing the internal flash space is available.
-
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf`.
+Revision 0.14.0 of nRF9160DK and all subsequent ones put the MCUboot secondary partition on the external flash instead of dividing the internal flash space. If you want to utilize internal flash memory instead, use `0.7.0` revision, by calling `west build -b nrf9160dk_nrf9160_ns@0.7.0 -- -DCONF_FILE=prj_intflash.conf`.
 
 ### Compiling with software-based cryptography
 
@@ -125,7 +123,7 @@ On Nordic boards, security is provided using the (D)TLS sockets implemented in m
 
 However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites and DTLS Connection ID support) that are not supported by the modem.
 
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG=overlay_nrf_mbedtls.conf`.
+To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf_mbedtls.conf`.
 
 ### Compiling with experimental Advanced Firmware Update object
 
@@ -137,11 +135,11 @@ to Firmware Update (/5) object, which allows for upgrading both application firm
 
 Binaries used to update the application are the same as those used in default Firmware Update (/5) object. nRF9160 firmware can be found [here](https://www.nordicsemi.com/Products/nRF9160/Download#infotabs).
 
-To compile in this configuration, use `west build -b <board-name> -- -DOVERLAY_CONFIG=overlay_nrf9160_afu.conf`.
+To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu.conf`.
 
 Additionally, on nRF9160DK revisions 0.14.0 and up, it's possible to also update modem firmware using [full firmware packages](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/2.4.0/nrfxlib/nrf_modem/doc/bootloader.html).
 
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns@0.14.0 -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG=overlay_nrf9160_afu_full.conf`.
+To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu_full.conf`.
 
 ## Flashing the target
 
@@ -237,7 +235,7 @@ Subcommands:
 
 To build a project with runtime certificate and private key, the following command will be suitable for most boards:
 ```
-west build -b <BOARD> -p -- -DCONFIG_ANJAY_ZEPHYR_RUNTIME_CERT_CONFIG=y
+west build -b <BOARD> [--sysbuild] -p -- -DCONFIG_ANJAY_ZEPHYR_RUNTIME_CERT_CONFIG=y
 ```
 where `<BOARD>` should be replaced by the selected board from `boards/` directory.
 
@@ -246,7 +244,7 @@ where `<BOARD>` should be replaced by the selected board from `boards/` director
 
 This feature works with nrf9160dk starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
 ```
-west build -b nrf9160dk_nrf9160_ns@0.14.0 -p -- -DCONF_FILE=prj_extflash.conf -DOVERLAY_CONFIG="overlay_nrf_mbedtls.conf"
+west build -b nrf9160dk_nrf9160_ns -p -- -DEXTRA_CONF_FILE="overlay_nrf_mbedtls.conf"
 ```
 
 After that, certificate and private key based on SECP256R1 curve can be provided through shell interface in PEM format. To generate them use following commands (to use certificate and private key with Coiote DM you must specify a common name that is the same as the client endpoint name):
@@ -276,6 +274,7 @@ To upgrade the firmware, upload the proper image using standard means of LwM2M F
 The image to use is:
 
 * for Nordic boards: `build/zephyr/app_update.bin`
+* for boards that use sysbuild: `build/demo/zephyr/zephyr.signed.bin`
 * for other boards: `build/zephyr/zephyr.signed.bin`
 
 ## Factory provisioning (experimental)

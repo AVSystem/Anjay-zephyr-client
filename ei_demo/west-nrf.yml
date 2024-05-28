@@ -28,5 +28,5 @@ manifest:
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
-    revision: 3.7.0
+    revision: 3.8.0
     path: modules/lib/anjay
