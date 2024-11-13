@@ -18,7 +18,7 @@ The following LwM2M Objects are supported by default:
 | Thingy:91 | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
 | DevEdge | **Firmware Update (/5)**<br>Location (/6)<br>Illuminance (/3301)<br>Temperature (/3303)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Push button (/3347) |
 | nRF52840DK | Push button (/3347) |
-| nRF7002DK | Light Control (/3311)<br>Push button (/3347) |
+| nRF7002DK | **Firmware Update (/5)**<br>Light Control (/3311)<br>Push button (/3347) |
 | Arduino Nano 33 BLE Sense Lite | Temperature (/3303)<br>Barometer (/3315) |
 > **__NOTE:__**
 > Lite version of `Arduino Nano 33 BLE Sense` does NOT contain HTS221 sensor.
@@ -43,9 +43,9 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk/nrf9160/ns`, `west build -b thingy91/nrf9160/ns`, `west build -b nrf7002dk/nrf5340/cpuapp/ns`, `west build -b nrf52840dk/nrf52840` or `west build -b arduino_nano_33_ble/nrf52840/sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
-By default, building for `nrf9160dk_nrf9160_ns` target is intended for nRF9160DK hardware revision 0.14.0. In order to protect against further NCS updates, we can provide the revision explicitly, by calling `west build -b nrf9160dk_nrf9160_ns@0.14.0`.
+By default, building for `nrf9160dk/nrf9160/ns` target is intended for nRF9160DK hardware revision 0.14.0. In order to protect against further NCS updates, we can provide the revision explicitly, by calling `west build -b nrf9160dk@0.14.0/nrf9160/ns`.
 
 ### Compilation guide for T-Mobile DevEdge
 
@@ -115,7 +115,7 @@ The preferred bearer can be saved onto persistent storage (among other settings)
 
 ### Compiling for external and internal flash usage
 
-Revision 0.14.0 of nRF9160DK and all subsequent ones put the MCUboot secondary partition on the external flash instead of dividing the internal flash space. If you want to utilize internal flash memory instead, use `0.7.0` revision, by calling `west build -b nrf9160dk_nrf9160_ns@0.7.0 -- -DCONF_FILE=prj_intflash.conf`.
+Revision 0.14.0 of nRF9160DK and all subsequent ones put the MCUboot secondary partition on the external flash instead of dividing the internal flash space. If you want to utilize internal flash memory instead, use `0.7.0` revision, by calling `west build -b nrf9160dk@0.7.0/nrf9160/ns -- -DFILE_SUFFIX=intflash`.
 
 ### Compiling with software-based cryptography
 
@@ -123,7 +123,7 @@ On Nordic boards, security is provided using the (D)TLS sockets implemented in m
 
 However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites and DTLS Connection ID support) that are not supported by the modem.
 
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf_mbedtls.conf`.
+To compile in this configuration, use `west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay_nrf_mbedtls.conf`.
 
 ### Compiling with experimental Advanced Firmware Update object
 
@@ -135,11 +135,11 @@ to Firmware Update (/5) object, which allows for upgrading both application firm
 
 Binaries used to update the application are the same as those used in default Firmware Update (/5) object. nRF9160 firmware can be found [here](https://www.nordicsemi.com/Products/nRF9160/Download#infotabs).
 
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu.conf`.
+To compile in this configuration, use `west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu.conf`.
 
 Additionally, on nRF9160DK revisions 0.14.0 and up, it's possible to also update modem firmware using [full firmware packages](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/2.4.0/nrfxlib/nrf_modem/doc/bootloader.html).
 
-To compile in this configuration, use `west build -b nrf9160dk_nrf9160_ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu_full.conf`.
+To compile in this configuration, use `west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay_nrf9160_afu_full.conf`.
 
 ## Flashing the target
 
@@ -244,7 +244,7 @@ where `<BOARD>` should be replaced by the selected board from `boards/` director
 
 This feature works with nrf9160dk starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
 ```
-west build -b nrf9160dk_nrf9160_ns -p -- -DEXTRA_CONF_FILE="overlay_nrf_mbedtls.conf"
+west build -b nrf9160dk/nrf9160/ns -p -- -DEXTRA_CONF_FILE="overlay_nrf_mbedtls.conf"
 ```
 
 After that, certificate and private key based on SECP256R1 curve can be provided through shell interface in PEM format. To generate them use following commands (to use certificate and private key with Coiote DM you must specify a common name that is the same as the client endpoint name):
@@ -309,7 +309,7 @@ Currently the script is designed only for Nordic boards, and it was tested with 
 Example script invocation from the `demo` for provisioning some nRF 9160DK board directory may look like:
 
 ```bash
-../tools/provisioning-tool/ptool.py -b nrf9160dk_nrf9160_ns -s <SERIAL> -c ../tools/provisioning-tool/configs/endpoint_cfg -t <TOKEN> -S ../tools/provisioning-tool/configs/lwm2m_server.json
+../tools/provisioning-tool/ptool.py -b nrf9160dk/nrf9160/ns -s <SERIAL> -c ../tools/provisioning-tool/configs/endpoint_cfg -t <TOKEN> -S ../tools/provisioning-tool/configs/lwm2m_server.json
 ```
 
 where `<SERIAL>` should be replaced by our board's serial number and `<TOKEN>` should be replaced by some valid authentication token for the Coiote server provided in the `lwm2m_server.json` file.
@@ -348,7 +348,7 @@ Once you have the server certificate, you can now provision the board. Example
 script invocation may look like:
 
 ```bash
-../tools/provisioning-tool/ptool.py -b nrf9160dk_nrf9160_ns -s <SERIAL> -c ../tools/provisioning-tool/configs/endpoint_cfg_cert -p eu-cloud-cert.der -C ../tools/provisioning-tool/configs/cert_info.json
+../tools/provisioning-tool/ptool.py -b nrf9160dk/nrf9160/ns -s <SERIAL> -c ../tools/provisioning-tool/configs/endpoint_cfg_cert -p eu-cloud-cert.der -C ../tools/provisioning-tool/configs/cert_info.json
 ```
 
 > **__NOTE:__**

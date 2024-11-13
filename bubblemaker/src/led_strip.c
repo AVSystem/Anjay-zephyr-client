@@ -29,10 +29,7 @@ LOG_MODULE_REGISTER(led_strip);
 
 #define STRIP_NODE DT_ALIAS(led_strip)
 #define STRIP_NUM_PIXELS DT_PROP(STRIP_NODE, chain_length)
-#define RGB(_r, _g, _b)                                                                            \
-	{                                                                                          \
-		.r = (_r), .g = (_g), .b = (_b)                                                    \
-	}
+#define RGB(_r, _g, _b) { .r = (_r), .g = (_g), .b = (_b) }
 
 static struct k_thread led_strip_thread;
 static K_THREAD_STACK_DEFINE(led_strip_stack, 1024);

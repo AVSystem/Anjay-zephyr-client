@@ -1,5 +1,16 @@
 # Changelog
 
+## 24.11 (November 13th, 2024)
+
+### Features
+- Added FOTA support for nRF7002DK board
+
+### Improvements
+- Updated Zephyr to 3.6.0
+- Updated sdk-nrf to 2.7.0
+- Updated Anjay-zephyr to 3.8.1
+- Added instruction for updating es-WiFi module for B-L475E-IOT01A Discovery kit
+
 ## 24.05 (May 28th, 2024)
 
 ### Improvements

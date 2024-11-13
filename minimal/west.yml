@@ -23,10 +23,10 @@ manifest:
   - name: zephyr
     path: zephyr
     remote: zephyrproject-rtos
-    revision: v3.5.0
+    revision: v3.6.0
     import: true
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
-    revision: 3.8.0
+    revision: 3.8.1
     path: modules/lib/anjay

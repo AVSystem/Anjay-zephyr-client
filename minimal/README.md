@@ -7,10 +7,10 @@ It should serve as a template for custom projects.
 This folder contains LwM2M Client minimal application example for following targets:
  - [qemu_x86](https://docs.zephyrproject.org/latest/boards/x86/qemu_x86/doc/index.html)
  - [disco_l475_iot1](https://docs.zephyrproject.org/latest/boards/arm/disco_l475_iot1/doc/index.html)
- - [nrf9160dk_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
- - [thingy91_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
+ - [nrf9160dk/nrf9160/ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
+ - [thingy91/nrf9160/ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_thingy91.html)
  - [ESP32-DevKitC](https://www.espressif.com/en/products/devkits/esp32-devkitc)
- - [nrf52840dk_nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html)
+ - [nrf52840dk/nrf52840](https://docs.zephyrproject.org/latest/boards/arm/nrf52840dk_nrf52840/doc/index.html)
  - [nRF7002 Development kit](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
  - [Arduino Nano 33 BLE Sense Lite](https://store.arduino.cc/products/arduino-nano-33-ble-sense)
  - [DevEdge](https://devedge.t-mobile.com/solutions/iotdevkit)
@@ -40,7 +40,7 @@ west config manifest.path Anjay-zephyr-client/minimal
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk_nrf9160_ns`, `west build -b thingy91_nrf9160_ns`, `west build -b nrf7002dk_nrf5340_cpuapp_ns`, `west build -b nrf52840dk_nrf52840` or `west build -b arduino_nano_33_ble_sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk/nrf9160/ns`, `west build -b thingy91/nrf9160/ns`, `west build -b nrf7002dk/nrf5340/cpuapp/ns`, `west build -b nrf52840dk/nrf52840` or `west build -b arduino_nano_33_ble/nrf52840/sense` in `minimal` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 ### Compilation guide for T-Mobile DevEdge
 

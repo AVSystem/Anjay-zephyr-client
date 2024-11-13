@@ -5,4 +5,12 @@
         status-led = &led0;
         light-control-0 = &led1;
     };
+
+    chosen {
+        nordic,pm-ext-flash = &mx25r64;
+    };
+};
+
+&mx25r64 {
+    status = "ok";
 };

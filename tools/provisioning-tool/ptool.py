@@ -43,7 +43,7 @@ class ZephyrImageBuilder:
         for kind in ['initial', 'final']:
             self.image_path[kind] = os.path.join(self.image_dir, f'{kind}.hex')
             self.overlay[kind] = os.path.join(
-                script_directory, f'{kind}_overlay_nrf9160dk.conf' if board == "nrf9160dk_nrf9160_ns" and kind == 'final' else f'{kind}_overlay.conf')
+                script_directory, f'{kind}_overlay_nrf9160dk.conf' if board == "nrf9160dk/nrf9160/ns" and kind == 'final' else f'{kind}_overlay.conf')
 
     def __build(self, kind):
         current_build_directory = os.path.join(self.image_dir, kind)

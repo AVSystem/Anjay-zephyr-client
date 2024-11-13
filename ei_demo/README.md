@@ -4,7 +4,7 @@ This example runs example motion recognition model, built with Edge Impulse, and
 ## Supported hardware and overview
 
 This example works on following targets:
- - `thingy91_nrf9160_ns`
+ - `thingy91/nrf9160/ns`
 
 The following LwM2M Objects are supported:
  - Security (/0)
@@ -21,7 +21,7 @@ west config manifest.file west-nrf.yml
 west update
 ```
 
-You can now compile the project for Thingy:91 using `west build -b thingy91_nrf9160_ns` in `ei_demo` directory.
+You can now compile the project for Thingy:91 using `west build -b thingy91/nrf9160/ns` in `ei_demo` directory.
 
 ## Flashing the target
 

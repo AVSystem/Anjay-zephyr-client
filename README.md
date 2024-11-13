@@ -21,7 +21,7 @@ The following examples are present:
     <tr>
       <td>demo/</td>
       <td>
-        Showcase example implementing all features and sensors available on board. Supports experimental <strong>factory provisioning</strong> feature of Anjay 3.0. Supported boards:<br>
+        Showcase example implementing all features and sensors available on board. Supports experimental <strong>factory provisioning</strong> feature of Anjay 3. Supported boards:<br>
         <a href="https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html">B-L475E-IOT01A Discovery kit</a><br>
         <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
@@ -142,7 +142,7 @@ Now we can add the application to VSC workspace. Click on nRF Connect tab ->
 Application -> Add Application. Open the folder containing the `prj.conf` file
 (e.g. `Anjay-zephyr-client/demo`). In the Application section the demo
 application should show up. Click on "No build configuration" to add a
-configuration for the desired target, e.g. `nrf9160dk_nrf9160_ns` (you can have
+configuration for the desired target, e.g. `nrf9160dk/nrf9160/ns` (you can have
 multiple configurations for different targets). Choose your target and click
 "Build Configuration" in order to build the application. Next builds can be
 started by choosing Actions -> Build.
@@ -179,3 +179,26 @@ is available on IoT Developer Zone.
 > **__NOTE:__**
 > You may use any LwM2M Server compliant with LwM2M 1.0 TS. The server URI can
 > be changed in the example configuration options.
+
+## Updating es-WiFi module firmware on B-L475E-IOT01A Discovery kit to make FOTA work
+
+There are known issues with the older es-WiFi firmware, particularly in handling
+multiple socket connections, which manifest during pull FOTA operations. To get
+rid of these problems, a WiFi module firmware update is required.
+
+Please download `Inventek ISM 43362 Wi-Fi module firmware update` package from
+[ST website](https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html#tools-software).
+If you are using Windows you can simple follow instructions from `readme.txt`.
+For Linux, please install the appropriate version of
+[STM32CubeProgrammer](https://www.st.com/en/development-tools/stm32cubeprog.html).
+Then follow steps 2 through 5 in `readme.txt`. Next, go to the
+`en.inventek_fw_updater.2.0/bin` directory, but do not run the `update_Wifi.bat`
+script. Instead, run (please update the path to `STM32_Programmer_CLI` and
+`/dev/ttyACM0` device port if necessary):
+
+```bash
+~/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI -c port=SWD -e all -d ./InventekBootloaderPassthrough.bin 0x08000000 -v -hardrst
+sleep 10
+~/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI -c port=/dev/ttyACM0 br=115200 p=EVEN db=8 sb=1 fc=OFF -e all
+~/STMicroelectronics/STM32Cube/STM32CubeProgrammer/bin/STM32_Programmer_CLI -c port=/dev/ttyACM0 br=115200 p=even db=8 sb=1 fc=OFF -d ./ISM43362_M3G_L44_SPI_C3.5.2.7.STM.bin 0x08000000 -v
+```

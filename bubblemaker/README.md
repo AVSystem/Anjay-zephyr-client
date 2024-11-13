@@ -2,8 +2,8 @@
 
 ## Supported hardware and overview
 This folder contains support for the following targets:
- - [nrf9160dk_nrf9160_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
- - [nrf7002dk_nrf5340_cpuapp_ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/device_guides/working_with_nrf/nrf70/gs.html)
+ - [nrf9160dk/nrf9160/ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/ug_nrf9160.html)
+ - [nrf7002dk/nrf5340/cpuapp/ns](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/device_guides/working_with_nrf/nrf70/gs.html)
 
  The following LwM2M Objects are supported:
  - Security (/0)

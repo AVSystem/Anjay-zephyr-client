@@ -42,18 +42,14 @@
 #define SWITCH_AVAILABLE_ANY (SWITCH_AVAILABLE(0) || SWITCH_AVAILABLE(1) || SWITCH_AVAILABLE(2))
 
 #define PUSH_BUTTON_GLUE_ITEM(num)                                                                 \
-	{                                                                                          \
-		.device = DEVICE_DT_GET(DT_GPIO_CTLR(PUSH_BUTTON_NODE(num), gpios)),               \
-		.gpio_pin = DT_GPIO_PIN(PUSH_BUTTON_NODE(num), gpios),                             \
-		.gpio_flags = (GPIO_INPUT | DT_GPIO_FLAGS(PUSH_BUTTON_NODE(num), gpios))           \
-	}
+	{ .device = DEVICE_DT_GET(DT_GPIO_CTLR(PUSH_BUTTON_NODE(num), gpios)),                     \
+	  .gpio_pin = DT_GPIO_PIN(PUSH_BUTTON_NODE(num), gpios),                                   \
+	  .gpio_flags = (GPIO_INPUT | DT_GPIO_FLAGS(PUSH_BUTTON_NODE(num), gpios)) }
 
 #define SWITCH_BUTTON_GLUE_ITEM(num)                                                               \
-	{                                                                                          \
-		.device = DEVICE_DT_GET(DT_GPIO_CTLR(SWITCH_NODE(num), gpios)),                    \
-		.gpio_pin = DT_GPIO_PIN(SWITCH_NODE(num), gpios),                                  \
-		.gpio_flags = (GPIO_INPUT | DT_GPIO_FLAGS(SWITCH_NODE(num), gpios))                \
-	}
+	{ .device = DEVICE_DT_GET(DT_GPIO_CTLR(SWITCH_NODE(num), gpios)),                          \
+	  .gpio_pin = DT_GPIO_PIN(SWITCH_NODE(num), gpios),                                        \
+	  .gpio_flags = (GPIO_INPUT | DT_GPIO_FLAGS(SWITCH_NODE(num), gpios)) }
 
 #define TEMPERATURE_NODE DT_ALIAS(temperature)
 #define TEMPERATURE_AVAILABLE DT_NODE_HAS_STATUS(TEMPERATURE_NODE, okay)

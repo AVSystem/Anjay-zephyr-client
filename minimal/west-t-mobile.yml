@@ -28,7 +28,7 @@ manifest:
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
-    revision: 3.8.0
+    revision: 3.8.1
     path: modules/lib/anjay
   - name: DevEdge-IoTDevKit-ZephyrSDK
     path: modules/lib/t-mobile-sdk

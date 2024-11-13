@@ -38,10 +38,6 @@ LOG_MODULE_REGISTER(sensor);
 #define ACIDITY_0_AVAILABLE ADC_HAS_SENSOR(acidity0)
 #define ACIDITY_1_AVAILABLE ADC_HAS_SENSOR(acidity1)
 
-#define ADC_DT_SPEC_GET_BY_NAME(NodeId, Name)                                                      \
-	ADC_DT_SPEC_STRUCT(DT_IO_CHANNELS_CTLR_BY_NAME(NodeId, Name),                              \
-			   DT_IO_CHANNELS_INPUT_BY_NAME(NodeId, Name))
-
 enum adc_channels {
 #if PRESSURE_0_AVAILABLE
 	ADC_CHANNEL_PRESSURE_0,
