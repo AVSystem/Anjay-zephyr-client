@@ -1,4 +1,4 @@
-# Copyright 2020-2024 AVSystem <avsystem@avsystem.com>
+# Copyright 2020-2025 AVSystem <avsystem@avsystem.com>
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ manifest:
   - name: Anjay-zephyr
     submodules: true
     remote: anjay
-    revision: 3.8.1
+    revision: 3.9.0
     path: modules/lib/anjay
   - name: DevEdge-IoTDevKit-ZephyrSDK
     path: modules/lib/t-mobile-sdk

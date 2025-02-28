@@ -1,5 +1,13 @@
 # Changelog
 
+## 25.02 (February 28th, 2024)
+
+### Features
+- Added nRF9151DK board as a target for demo sample
+
+### Improvements
+- Updated Anjay-zephyr to 3.9.0
+
 ## 24.11 (November 13th, 2024)
 
 ### Features

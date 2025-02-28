@@ -25,6 +25,7 @@ The following examples are present:
         <a href="https://www.st.com/en/evaluation-tools/b-l475e-iot01a.html">B-L475E-IOT01A Discovery kit</a><br>
         <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9160-DK">nRF9160 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/Nordic-Thingy-91">Nordic Thingy:91 Prototyping kit</a><br>
+        <a href="https://www.nordicsemi.com/Software-and-Tools/Development-Kits/nRF9151-DK">nRF9151 Development kit</a><br>
         <a href="https://www.espressif.com/en/products/devkits/esp32-devkitc">ESP32-DevKitC</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/nrf52840-dk">nRF52840 Development kit</a><br>
         <a href="https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK">nRF7002 Development kit</a><br>
@@ -76,12 +77,12 @@ After navigating to Zephyr workspace (`~/zephyrproject` is default after followi
 git clone https://github.com/AVSystem/Anjay-zephyr-client
 ```
 
-If you want to compile for nRF9160 targets, additional GNU Arm Embedded Toolchain is necessary, to install it follow
+If you want to compile for nRF91 targets, additional GNU Arm Embedded Toolchain is necessary, to install it follow
 [installing the toolchain for NCS guide](https://developer.nordicsemi.com/nRF_Connect_SDK/doc/latest/nrf/gs_installing.html#install-the-toolchain). Also for flashing [nRF Command Line Tools](https://www.nordicsemi.com/Products/Development-tools/nrf-command-line-tools) have to be installed.
 
 For further instructions, check `README.md` in the folder with the example in which you are interested.
 
-### Setting up Visual Studio Code (for nRF9160 targets)
+### Setting up Visual Studio Code (for nRF91 targets)
 
 The nRF Connect SDK has a set of plugins for Visual Studio Code (VSC). They can
 be used to simplify the build process for the nRF boards. To do that we need to
@@ -147,9 +148,9 @@ multiple configurations for different targets). Choose your target and click
 "Build Configuration" in order to build the application. Next builds can be
 started by choosing Actions -> Build.
 
-### Enabling GPS implementation (for nRF9160 targets)
+### Enabling GPS implementation (for nRF91 targets)
 
-Anjay-zephyr-client has the support for GPS implementation for nRF9160 targets
+Anjay-zephyr-client has the support for GPS implementation for nRF91 targets
 which can be enabled using `Kconfig` options. Some of the available options are:
 - `CONFIG_ANJAY_ZEPHYR_GPS` - enables/disables support for GPS
 - `CONFIG_ANJAY_ZEPHYR_GPS_NRF_A_GPS` - enables/disables A-GPS using Nordic

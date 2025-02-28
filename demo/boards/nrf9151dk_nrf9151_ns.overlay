@@ -1,0 +1,18 @@
+/ {
+    aliases {
+        push-button-0 = &button0;
+        push-button-1 = &button1;
+        switch-0 = &button2;
+        switch-1 = &button3;
+        status-led = &led0;
+    };
+
+	/* Configure partition manager to use gd25wb256 as the external flash */
+	chosen {
+		nordic,pm-ext-flash = &gd25wb256;
+	};
+};
+
+&gd25wb256 {
+	status = "okay";
+};

@@ -15,6 +15,7 @@ The following LwM2M Objects are supported by default:
 | Common | Security (/0)<br>Server (/1)<br>Device (/3) |
 | B-L475E-IOT01A | **Firmware Update (/5)** (experimental)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Magnetometer (/3314)<br>Barometer (/3315)<br>Distance (/3330)<br>Gyrometer (/3334)<br>Push button (/3347) |
 | nRF9160DK | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
+| nRF9151DK | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>On/Off switch (/3342)<br>Push button (/3347)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig) |
 | Thingy:91 | Connectivity Monitoring (/4)<br>**Firmware Update (/5)**<br>Location (/6)<br>Temperature (/3303)<br>Humidity (/3304)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Buzzer (/3338)<br>Push button (/3347)<br>LED color light (/3420)<br>ECID-Signal Measurement Information (/10256)<br>GNSS Assistance (/33625) (experimental)<br>Ground Fix Location (/33626) (experimental, to enable in Kconfig)<br>Advanced Firmware Update (/33629) (experimental, to enable in Kconfig) |
 | DevEdge | **Firmware Update (/5)**<br>Location (/6)<br>Illuminance (/3301)<br>Temperature (/3303)<br>Accelerometer (/3313)<br>Barometer (/3315)<br>Push button (/3347) |
 | nRF52840DK | Push button (/3347) |
@@ -34,7 +35,7 @@ west update
 
 You can now compile the project for B-L475E-IOT01A using `west build -b disco_l475_iot1 --sysbuild` in `demo` directory.
 
-### Compilation guide for nRF9160DK, Thingy:91, nRF7002DK, nRF52840DK and Arduino Nano 33 BLE Sense
+### Compilation guide for nRF9160DK, nRF9151DK, Thingy:91, nRF7002DK, nRF52840DK and Arduino Nano 33 BLE Sense
 
 Because NCS uses different Zephyr version, it is necessary to change our Zephyr workspace, it is handled by using different manifest file.
 Set West manifest path to `Anjay-zephyr-client/demo`, and manifest file to `west-nrf.yml` and do `west update`.
@@ -43,7 +44,7 @@ west config manifest.path Anjay-zephyr-client/demo
 west config manifest.file west-nrf.yml
 west update
 ```
-Now you can compile the project using `west build -b nrf9160dk/nrf9160/ns`, `west build -b thingy91/nrf9160/ns`, `west build -b nrf7002dk/nrf5340/cpuapp/ns`, `west build -b nrf52840dk/nrf52840` or `west build -b arduino_nano_33_ble/nrf52840/sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
+Now you can compile the project using `west build -b nrf9160dk/nrf9160/ns`, `west build -b nrf9151dk/nrf9151/ns`, `west build -b thingy91/nrf9160/ns`, `west build -b nrf7002dk/nrf5340/cpuapp/ns`, `west build -b nrf52840dk/nrf52840` or `west build -b arduino_nano_33_ble/nrf52840/sense` in `demo` directory, respectively. The last two commands compiles project for use with the OpenThread network, more about this can be found in the section [Connecting to the LwM2M Server with OpenThread](#connecting-to-the-lwm2m-server-with-openthread).
 
 By default, building for `nrf9160dk/nrf9160/ns` target is intended for nRF9160DK hardware revision 0.14.0. In order to protect against further NCS updates, we can provide the revision explicitly, by calling `west build -b nrf9160dk@0.14.0/nrf9160/ns`.
 
@@ -121,9 +122,9 @@ Revision 0.14.0 of nRF9160DK and all subsequent ones put the MCUboot secondary p
 
 On Nordic boards, security is provided using the (D)TLS sockets implemented in modem firmware and provided by nrfxlib.
 
-However, on nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites and DTLS Connection ID support) that are not supported by the modem.
+However, on nRF9151DK and nRF9160DK revisions 0.14.0 and up, it is possible to switch to software-based implementation based on Mbed TLS instead. This is not recommended due to lowered security and performance, but may be desirable if you require some specific (D)TLS features (e.g. ciphersuites and DTLS Connection ID support) that are not supported by the modem.
 
-To compile in this configuration, use `west build -b nrf9160dk/nrf9160/ns -- -DEXTRA_CONF_FILE=overlay_nrf_mbedtls.conf`.
+To compile in this configuration, use `west build -b nrf91(60|51)dk/nrf91(60|51)/ns -- -DEXTRA_CONF_FILE=overlay_nrf_mbedtls.conf`.
 
 ### Compiling with experimental Advanced Firmware Update object
 
@@ -242,9 +243,9 @@ where `<BOARD>` should be replaced by the selected board from `boards/` director
 > **__NOTE:__**
 > Runtime certificate and private key do not work with Thingy:91.
 
-This feature works with nrf9160dk starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
+This feature works with nRF9151DK and nrf9160DK starting from revision v0.14.0. For this board use configuration which utilizes external flash chip and software-based cryptography:
 ```
-west build -b nrf9160dk/nrf9160/ns -p -- -DEXTRA_CONF_FILE="overlay_nrf_mbedtls.conf"
+west build -b nrf91(60|51)dk/nrf91(60|51)/ns -p -- -DEXTRA_CONF_FILE="overlay_nrf_mbedtls.conf"
 ```
 
 After that, certificate and private key based on SECP256R1 curve can be provided through shell interface in PEM format. To generate them use following commands (to use certificate and private key with Coiote DM you must specify a common name that is the same as the client endpoint name):
