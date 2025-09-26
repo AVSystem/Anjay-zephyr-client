@@ -1,5 +1,10 @@
 # Changelog
 
+## 26.09 (September 26th, 2025)
+
+### Improvements
+- Updated Anjay-zephyr to 3.11.0
+
 ## 25.05 (May 29th, 2025)
 
 ### Improvements

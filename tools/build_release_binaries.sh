@@ -69,7 +69,7 @@ update_west() {
 }
 
 set_anjay_version() {
-    sed -i -e "s/25.05/$ANJAY_VERSION/g" $ANJAY_ZEPHYR_ROOT/deps/anjay/src/core/anjay_core.c
+    sed -i -e "s/26.09/$ANJAY_VERSION/g" $ANJAY_ZEPHYR_ROOT/deps/anjay/src/core/anjay_core.c
 }
 
 if [[ -z "$CLIENT_VERSION" || -z "$ANJAY_VERSION" || -z "$ZEPHYRPROJECT_PATH" ]]; then
