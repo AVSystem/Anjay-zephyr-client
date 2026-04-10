@@ -1,5 +1,17 @@
 # Anjay-zephyr-client [<img align="right" height="50px" src="https://avsystem.github.io/Anjay-doc/_images/avsystem_logo.png">](http://www.avsystem.com/)
 
+## ⚠️ Archived Repository
+
+**This repository is no longer actively maintained by the team. It is provided as is for reference purposes only.**
+**We do not accept issues, pull requests, or provide support.**
+
+**[Anjay-zephyr-demo](https://github.com/AVSystem/Anjay-zephyr-demo) is the new application example based on Anjay in Zephyr OS.**
+
+**If you are still interested in this project or have questions, feel free to contact us. https://avsystem.com/contact/**
+
+---
+
+
 ## Overview
 
 This repository contains LwM2M Client samples based on open-source
